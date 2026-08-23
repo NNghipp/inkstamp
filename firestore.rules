@@ -1,0 +1,79 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function isFriendshipMember() {
+      return signedIn() && request.auth.uid in resource.data.members;
+    }
+
+    match /users/{userId} {
+      allow read: if isSelf(userId);
+      allow create, update, delete: if false;
+
+      match /closeFriends/{friendId} {
+        allow read: if isSelf(userId);
+        allow write: if false;
+      }
+
+      match /deliveries/{stampId} {
+        allow read: if isSelf(userId);
+        allow write: if false;
+      }
+
+      match /devices/{deviceId} {
+        allow read: if false;
+        allow create, update: if isSelf(userId)
+          && request.resource.data.keys().hasOnly([
+            'token',
+            'platform',
+            'updatedAt'
+          ])
+          && request.resource.data.token is string
+          && request.resource.data.platform in ['ios', 'android'];
+        allow delete: if isSelf(userId);
+      }
+
+      match /dailyQuotas/{quotaId} {
+        allow read, write: if false;
+      }
+
+      match /publishRequests/{requestId} {
+        allow read, write: if false;
+      }
+    }
+
+    match /usernames/{username} {
+      allow read, write: if false;
+    }
+
+    match /friendships/{friendshipId} {
+      allow read: if isFriendshipMember();
+      allow write: if false;
+    }
+
+    match /stamps/{stampId} {
+      allow read: if signedIn() && resource.data.senderId == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /reports/{reportId} {
+      allow read, write: if false;
+    }
+
+    match /moderationActions/{actionId} {
+      allow read, write: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
