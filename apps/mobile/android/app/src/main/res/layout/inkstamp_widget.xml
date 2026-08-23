@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/inkstamp_widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/inkstamp_widget_background"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:padding="12dp">
+
+    <ImageView
+        android:id="@+id/inkstamp_widget_image"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:contentDescription="@string/inkstamp_widget_description"
+        android:scaleType="centerCrop"
+        android:visibility="gone" />
+
+    <ImageView
+        android:id="@+id/inkstamp_widget_placeholder"
+        android:layout_width="64dp"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:contentDescription="@string/inkstamp_widget_description"
+        android:src="@drawable/ic_inkstamp_widget" />
+
+    <TextView
+        android:id="@+id/inkstamp_widget_sender"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:ellipsize="end"
+        android:fontFamily="sans-serif-medium"
+        android:gravity="center"
+        android:maxLines="1"
+        android:text="Inkstamp"
+        android:textColor="#22211F"
+        android:textSize="13sp" />
+</LinearLayout>

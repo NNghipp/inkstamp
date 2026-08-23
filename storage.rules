@@ -1,0 +1,43 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isSafeJpeg() {
+      return request.resource != null
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType == 'image/jpeg';
+    }
+
+    match /drafts/{userId}/{draftId}/{fileName} {
+      allow read: if signedIn() && request.auth.uid == userId;
+      allow create, update: if signedIn()
+        && request.auth.uid == userId
+        && fileName in ['stamp.jpg', 'thumbnail.jpg']
+        && isSafeJpeg();
+      allow delete: if signedIn() && request.auth.uid == userId;
+    }
+
+    match /stamps/{senderId}/{stampId}/{fileName} {
+      allow read: if signedIn() && (
+        request.auth.uid == senderId
+        || (
+          firestore.exists(
+            /databases/(default)/documents/users/$(request.auth.uid)/deliveries/$(stampId)
+          )
+          && firestore.get(
+            /databases/(default)/documents/users/$(request.auth.uid)/deliveries/$(stampId)
+          ).data.status == 'available'
+        )
+      );
+      allow write: if false;
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
