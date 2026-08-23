@@ -1,0 +1,120 @@
+# Inkstamp — MVP implementation plan
+
+## Product
+
+Inkstamp is a camera-first private social app for turning immediate moments
+into aesthetic stamps. A stamp is sent to all accepted friends by default, or
+to Close Friends / selected people. Recipients can react with a fixed emoji or
+reply with another stamp. Sent and received stamps are retained in a calendar.
+
+## MVP
+
+- Flutter application for iOS and Android.
+- Apple/Google authentication and unique usernames.
+- Friend requests through username, QR and invite links.
+- Camera-only capture, square crop, four stamp edges and six paper tones.
+- All Friends, Close Friends and Select People audiences.
+- Private inbox, reactions, stamp replies and calendar archive.
+- Push notifications and a latest-stamp home-screen widget.
+- Report, block, content removal and account deletion.
+
+Public feeds, text chat, video, gallery import, advanced editing, arbitrary
+groups, downloads, payments and end-to-end encryption are excluded.
+
+## Architecture
+
+The mobile app uses feature-first Clean Architecture:
+
+```text
+Presentation -> Use cases -> Domain <- Data implementations <- SDKs
+```
+
+- Domain code never imports Flutter or Firebase.
+- Screens only render state and dispatch actions.
+- Repository contracts live in `domain`; implementations live in `data`.
+- Firebase DTOs are mapped into domain entities before reaching the UI.
+- Navigation is centralized in GoRouter.
+- Riverpod supplies dependency injection and immutable feature state.
+- Every routable screen has its own file and one clear responsibility.
+
+The Firebase backend uses:
+
+```text
+Callable controller -> service/use case -> repository -> Firebase Admin SDK
+```
+
+All privileged mutations validate Auth, App Check and input. Publishing is
+idempotent and resolves audiences on the server.
+
+## Primary routes
+
+```text
+/splash
+/welcome
+/sign-in
+/setup-username
+/permissions
+/widget-intro
+/inbox
+/camera
+/camera/preview
+/camera/editor
+/camera/audience
+/camera/sending
+/camera/success
+/stamp/:stampId
+/stamp/:stampId/reply
+/stamp/:stampId/report
+/calendar
+/calendar/day/:date
+/calendar/stamp/:stampId
+/friends
+/friends/search
+/friends/requests
+/friends/close-friends
+/friends/profile/:uid
+/friends/invite
+/settings
+/settings/profile
+/settings/notifications
+/settings/privacy
+/settings/blocked-users
+/settings/help
+/settings/delete-account
+```
+
+## Data
+
+```text
+users/{uid}
+usernames/{normalizedUsername}
+friendships/{pairId}
+users/{uid}/closeFriends/{friendUid}
+stamps/{stampId}
+users/{uid}/deliveries/{stampId}
+users/{uid}/devices/{deviceId}
+reports/{reportId}
+moderationActions/{actionId}
+```
+
+Raw camera files are never uploaded. The client strips metadata and creates a
+1440×1440 JPEG plus a 512×512 thumbnail. Local drafts expire after 24 hours.
+
+## Quality gates
+
+- `dart format --set-exit-if-changed`
+- `flutter analyze`
+- `flutter test --coverage`
+- TypeScript lint, tests and build.
+- Firebase Rules emulator tests.
+- Android and iOS debug builds in CI.
+- Domain/use-case target coverage: 90%.
+- Data/backend service target coverage: 80%.
+
+## Delivery
+
+The baseline schedule is 16 weeks for one developer. Native background widget
+refresh, signing, store credentials and production Firebase configuration are
+external prerequisites. Closed beta targets 50–200 users and a maximum of 50
+friends per account.
+
