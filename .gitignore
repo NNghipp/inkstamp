@@ -25,6 +25,11 @@ node_modules/
 functions/lib/
 functions/.env
 functions/.secret.local
+**/.dev.vars
+**/.dev.vars.*
+!**/.dev.vars.example
+**/.wrangler/
+workers/media-gateway/worker-configuration.d.ts
 
 # Editors / OS
 .idea/
