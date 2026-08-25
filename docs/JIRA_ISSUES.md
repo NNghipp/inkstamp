@@ -16,6 +16,7 @@ actual Jira project key during synchronization.
 | `INK-LOCAL-006` | Security | High | Open | Media gateway has no distributed rate limiting |
 | `INK-LOCAL-007` | Task | High | Blocked | Real Firebase Apple/Google authentication needs approved project configuration |
 | `INK-LOCAL-008` | Maintenance | Medium | Open | Firebase plugins still apply the legacy Kotlin Gradle Plugin |
+| `INK-LOCAL-009` | Security | Medium | Fixed | Firebase Functions resolved a vulnerable transitive uuid version |
 
 ## Fix notes
 
@@ -76,3 +77,13 @@ The Android debug build succeeds, but Flutter reports that several Firebase
 plugins still apply the Kotlin Gradle Plugin and may fail with a future Flutter
 release. Recheck compatible Firebase package versions before the next Flutter
 upgrade; do not force an incompatible dependency update during this milestone.
+
+### `INK-LOCAL-009`
+
+- Cause: the Firebase Functions dependency graph resolved `uuid` below the
+  patched `11.1.1` release and triggered a GitHub Dependabot alert.
+- Fix: added an npm override for `uuid` `11.1.1` on the dedicated
+  `fix/functions-uuid-advisory` branch.
+- Verification: `npm ls uuid` resolves `11.1.1`, `npm audit` reports zero
+  vulnerabilities, and Functions lint, eight tests and TypeScript build pass.
+- Pull request: `#9`, targeting `main`.
