@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-import 'package:inkstamp/app/router/app_routes.dart';
 import 'package:inkstamp/app/theme/app_colors.dart';
 import 'package:inkstamp/app/theme/app_spacing.dart';
 import 'package:inkstamp/core/widgets/inkstamp_button.dart';
@@ -109,22 +107,11 @@ class _UsernameSetupScreenState extends ConsumerState<UsernameSetupScreen> {
   }
 
   Future<void> _submit() async {
-    final String username = _usernameController.text.trim().toLowerCase();
-    final String displayName = _displayNameController.text.trim();
-    final RegExp usernamePattern = RegExp(r'^[a-z0-9._]{3,20}$');
-
-    if (displayName.isEmpty || !usernamePattern.hasMatch(username)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please check your name and username.')),
-      );
-      return;
-    }
-
-    final bool success = await ref
+    await ref
         .read(sessionControllerProvider.notifier)
-        .completeProfile(username: username, displayName: displayName);
-    if (success && mounted) {
-      context.go(AppRoutes.permissions);
-    }
+        .completeProfile(
+          username: _usernameController.text,
+          displayName: _displayNameController.text,
+        );
   }
 }

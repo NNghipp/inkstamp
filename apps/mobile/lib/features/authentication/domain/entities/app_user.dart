@@ -11,6 +11,8 @@ class AppUser {
   final String displayName;
   final bool onboardingComplete;
 
+  bool get needsProfileSetup => username.isEmpty || displayName.isEmpty;
+
   AppUser copyWith({
     String? username,
     String? displayName,

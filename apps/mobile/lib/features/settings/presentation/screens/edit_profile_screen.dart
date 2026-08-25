@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:inkstamp/app/theme/app_colors.dart';
 import 'package:inkstamp/app/theme/app_spacing.dart';
 import 'package:inkstamp/core/widgets/inkstamp_button.dart';
 import 'package:inkstamp/core/widgets/inkstamp_scaffold.dart';
@@ -35,7 +36,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final AppUser? user = ref.watch(sessionControllerProvider).user;
+    final SessionState state = ref.watch(sessionControllerProvider);
+    final AppUser? user = state.user;
 
     return InkstampScaffold(
       title: 'Edit profile',
@@ -69,19 +71,28 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           const SizedBox(height: AppSpacing.xl),
           InkstampButton(
             label: 'Save changes',
-            onPressed: () {
-              final String name = _displayNameController.text.trim();
-              if (name.isEmpty) {
-                return;
-              }
-              ref
-                  .read(sessionControllerProvider.notifier)
-                  .updateDisplayName(name);
-              context.pop();
-            },
+            isLoading: state.isLoading,
+            onPressed: state.isLoading ? null : _save,
           ),
+          if (state.errorMessage != null) ...<Widget>[
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              state.errorMessage!,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: AppColors.danger),
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  Future<void> _save() async {
+    final bool success = await ref
+        .read(sessionControllerProvider.notifier)
+        .updateDisplayName(_displayNameController.text);
+    if (success && mounted) {
+      context.pop();
+    }
   }
 }
