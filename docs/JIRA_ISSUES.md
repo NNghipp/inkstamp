@@ -15,6 +15,7 @@ actual Jira project key during synchronization.
 | `INK-LOCAL-005` | Security | Highest | Open | Media gateway does not verify Firebase App Check tokens |
 | `INK-LOCAL-006` | Security | High | Open | Media gateway has no distributed rate limiting |
 | `INK-LOCAL-007` | Task | High | Blocked | Real Firebase Apple/Google authentication needs approved project configuration |
+| `INK-LOCAL-008` | Maintenance | Medium | Open | Firebase plugins still apply the legacy Kotlin Gradle Plugin |
 
 ## Fix notes
 
@@ -68,3 +69,10 @@ because Worker isolates are reused and not globally consistent.
 The mobile foundation remains in demo/in-memory mode. Real Apple/Google sign-in
 requires owner-approved Firebase projects, app registrations and credentials.
 No credential or billing change will be made without explicit approval.
+
+### `INK-LOCAL-008`
+
+The Android debug build succeeds, but Flutter reports that several Firebase
+plugins still apply the Kotlin Gradle Plugin and may fail with a future Flutter
+release. Recheck compatible Firebase package versions before the next Flutter
+upgrade; do not force an incompatible dependency update during this milestone.
