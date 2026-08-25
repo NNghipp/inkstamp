@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-import 'package:inkstamp/app/router/app_routes.dart';
 import 'package:inkstamp/app/theme/app_colors.dart';
 import 'package:inkstamp/app/theme/app_spacing.dart';
 import 'package:inkstamp/core/widgets/inkstamp_button.dart';
@@ -78,9 +76,10 @@ class WidgetIntroScreen extends ConsumerWidget {
           const Spacer(),
           InkstampButton(
             label: 'Finish',
-            onPressed: () {
-              ref.read(sessionControllerProvider.notifier).completeOnboarding();
-              context.go(AppRoutes.camera);
+            onPressed: () async {
+              await ref
+                  .read(sessionControllerProvider.notifier)
+                  .completeOnboarding();
             },
           ),
           const SizedBox(height: AppSpacing.lg),

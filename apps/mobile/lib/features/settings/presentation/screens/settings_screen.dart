@@ -81,12 +81,7 @@ class SettingsScreen extends ConsumerWidget {
             icon: Icons.logout_rounded,
             title: 'Sign out',
             iconColor: AppColors.mist,
-            onTap: () async {
-              await ref.read(sessionControllerProvider.notifier).signOut();
-              if (context.mounted) {
-                context.go(AppRoutes.welcome);
-              }
-            },
+            onTap: () => ref.read(sessionControllerProvider.notifier).signOut(),
           ),
           SettingsTile(
             icon: Icons.delete_outline_rounded,

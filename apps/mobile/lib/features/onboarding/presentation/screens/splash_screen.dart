@@ -1,26 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
-import 'package:inkstamp/app/router/app_routes.dart';
 import 'package:inkstamp/app/theme/app_colors.dart';
 import 'package:inkstamp/core/widgets/paper_background.dart';
 
-class SplashScreen extends StatefulWidget {
+class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
-
-  @override
-  State<SplashScreen> createState() => _SplashScreenState();
-}
-
-class _SplashScreenState extends State<SplashScreen> {
-  @override
-  void initState() {
-    super.initState();
-    Future<void>.delayed(const Duration(milliseconds: 850), () {
-      if (mounted) {
-        context.go(AppRoutes.welcome);
-      }
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
