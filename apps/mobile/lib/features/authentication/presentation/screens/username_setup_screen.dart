@@ -1,7 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-import 'package:inkstamp/app/router/app_routes.dart';
 import 'package:inkstamp/app/theme/app_colors.dart';
 import 'package:inkstamp/app/theme/app_spacing.dart';
 import 'package:inkstamp/core/widgets/inkstamp_button.dart';
@@ -25,11 +25,54 @@ class _UsernameSetupScreenState extends ConsumerState<UsernameSetupScreen> {
     text: 'minhanh.stamps',
   );
 
+  // Debounced username availability state
+  Timer? _debounceTimer;
+  _UsernameStatus _usernameStatus = _UsernameStatus.idle;
+
+  static final RegExp _usernamePattern = RegExp(r'^[a-z0-9._]{3,20}$');
+
+  @override
+  void initState() {
+    super.initState();
+    _usernameController.addListener(_onUsernameChanged);
+  }
+
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _displayNameController.dispose();
     _usernameController.dispose();
     super.dispose();
+  }
+
+  void _onUsernameChanged() {
+    final String raw = _usernameController.text.trim().toLowerCase();
+    _debounceTimer?.cancel();
+
+    if (raw.isEmpty || !_usernamePattern.hasMatch(raw)) {
+      setState(() => _usernameStatus = _UsernameStatus.idle);
+      return;
+    }
+
+    setState(() => _usernameStatus = _UsernameStatus.checking);
+
+    _debounceTimer = Timer(const Duration(milliseconds: 500), () async {
+      final bool available = await ref
+          .read(authenticationRepositoryProvider)
+          .isUsernameAvailable(raw);
+
+      if (!mounted) {
+        return;
+      }
+
+      // Guard against stale callback – only apply if the text hasn't changed.
+      if (_usernameController.text.trim().toLowerCase() == raw) {
+        setState(() {
+          _usernameStatus =
+              available ? _UsernameStatus.available : _UsernameStatus.taken;
+        });
+      }
+    });
   }
 
   @override
@@ -82,14 +125,22 @@ class _UsernameSetupScreenState extends ConsumerState<UsernameSetupScreen> {
           TextField(
             controller: _usernameController,
             autocorrect: false,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: 'Username',
               prefixText: '@',
-              prefixIcon: Icon(Icons.alternate_email_rounded),
+              prefixIcon: const Icon(Icons.alternate_email_rounded),
               helperText:
                   '3–20 characters: lowercase letters, numbers, dots or underscores.',
+              suffixIcon: _buildUsernameSuffix(),
             ),
           ),
+          if (_usernameStatus == _UsernameStatus.taken) ...<Widget>[
+            const SizedBox(height: AppSpacing.xs),
+            const Text(
+              'This username is already taken.',
+              style: TextStyle(color: AppColors.danger, fontSize: 13),
+            ),
+          ],
           if (state.errorMessage != null) ...<Widget>[
             const SizedBox(height: AppSpacing.sm),
             Text(
@@ -108,23 +159,45 @@ class _UsernameSetupScreenState extends ConsumerState<UsernameSetupScreen> {
     );
   }
 
+  Widget? _buildUsernameSuffix() {
+    return switch (_usernameStatus) {
+      _UsernameStatus.idle => null,
+      _UsernameStatus.checking => const Padding(
+          padding: EdgeInsets.all(12),
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      _UsernameStatus.available => const Icon(
+          Icons.check_circle_rounded,
+          color: AppColors.success,
+        ),
+      _UsernameStatus.taken => const Icon(
+          Icons.cancel_rounded,
+          color: AppColors.danger,
+        ),
+    };
+  }
+
   Future<void> _submit() async {
     final String username = _usernameController.text.trim().toLowerCase();
     final String displayName = _displayNameController.text.trim();
-    final RegExp usernamePattern = RegExp(r'^[a-z0-9._]{3,20}$');
 
-    if (displayName.isEmpty || !usernamePattern.hasMatch(username)) {
+    if (displayName.isEmpty || !_usernamePattern.hasMatch(username)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please check your name and username.')),
       );
       return;
     }
 
-    final bool success = await ref
+    // GoRouter redirect will automatically navigate to the next screen
+    // once SessionStage changes to `permissions`.
+    await ref
         .read(sessionControllerProvider.notifier)
         .completeProfile(username: username, displayName: displayName);
-    if (success && mounted) {
-      context.go(AppRoutes.permissions);
-    }
   }
 }
+
+enum _UsernameStatus { idle, checking, available, taken }

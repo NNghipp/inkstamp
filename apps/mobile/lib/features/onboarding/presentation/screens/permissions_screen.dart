@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-import 'package:inkstamp/app/router/app_routes.dart';
 import 'package:inkstamp/app/theme/app_colors.dart';
 import 'package:inkstamp/app/theme/app_spacing.dart';
 import 'package:inkstamp/core/widgets/inkstamp_button.dart';
@@ -44,8 +42,19 @@ class PermissionsScreen extends ConsumerWidget {
               ref
                   .read(sessionControllerProvider.notifier)
                   .completePermissions();
-              context.go(AppRoutes.widgetIntro);
             },
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          TextButton(
+            onPressed: () {
+              ref
+                  .read(sessionControllerProvider.notifier)
+                  .completePermissions();
+            },
+            child: const Text(
+              'Skip for now',
+              style: TextStyle(color: AppColors.charcoal),
+            ),
           ),
           const SizedBox(height: AppSpacing.lg),
         ],

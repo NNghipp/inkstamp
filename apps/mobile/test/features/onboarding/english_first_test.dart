@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:inkstamp/app/app.dart';
 import 'package:inkstamp/features/onboarding/presentation/screens/welcome_screen.dart';
@@ -7,7 +8,7 @@ void main() {
   testWidgets('the application is explicitly English-first', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const InkstampApp());
+    await tester.pumpWidget(const ProviderScope(child: InkstampApp()));
 
     final MaterialApp app = tester.widget<MaterialApp>(
       find.byType(MaterialApp),

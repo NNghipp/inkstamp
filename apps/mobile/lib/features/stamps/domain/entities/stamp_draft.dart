@@ -8,6 +8,10 @@ class StampDraft {
     required this.audience,
     this.selectedRecipientIds = const <String>{},
     this.replyToStampId,
+    this.localImagePath,
+    this.localThumbnailPath,
+    this.cloudinaryPublicId,
+    this.cloudinaryThumbnailPublicId,
   });
 
   factory StampDraft.initial() {
@@ -25,6 +29,10 @@ class StampDraft {
   final AudienceMode audience;
   final Set<String> selectedRecipientIds;
   final String? replyToStampId;
+  final String? localImagePath;
+  final String? localThumbnailPath;
+  final String? cloudinaryPublicId;
+  final String? cloudinaryThumbnailPublicId;
 
   StampDraft copyWith({
     int? seed,
@@ -34,6 +42,10 @@ class StampDraft {
     Set<String>? selectedRecipientIds,
     String? replyToStampId,
     bool clearReply = false,
+    String? localImagePath,
+    String? localThumbnailPath,
+    String? cloudinaryPublicId,
+    String? cloudinaryThumbnailPublicId,
   }) {
     return StampDraft(
       seed: seed ?? this.seed,
@@ -42,6 +54,10 @@ class StampDraft {
       audience: audience ?? this.audience,
       selectedRecipientIds: selectedRecipientIds ?? this.selectedRecipientIds,
       replyToStampId: clearReply ? null : replyToStampId ?? this.replyToStampId,
+      localImagePath: localImagePath ?? this.localImagePath,
+      localThumbnailPath: localThumbnailPath ?? this.localThumbnailPath,
+      cloudinaryPublicId: cloudinaryPublicId ?? this.cloudinaryPublicId,
+      cloudinaryThumbnailPublicId: cloudinaryThumbnailPublicId ?? this.cloudinaryThumbnailPublicId,
     );
   }
 }

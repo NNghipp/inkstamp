@@ -7,6 +7,16 @@ import {
   FirebaseIdTokenVerifier,
   InvalidAuthenticationError,
 } from "../data/firebase_id_token_verifier";
+import {
+  FirebaseAppCheckVerifier,
+  InvalidAppCheckError,
+} from "../data/firebase_app_check_verifier";
+import {
+  InMemoryRateLimiter,
+} from "../data/rate_limiter";
+import {
+  generateDeliveryUrl,
+} from "../domain/cloudinary_delivery";
 
 export interface CloudinarySecrets {
   readonly CLOUDINARY_API_KEY: string;
@@ -15,7 +25,10 @@ export interface CloudinarySecrets {
   readonly CLOUDINARY_UPLOAD_PRESET: string;
 }
 
-export type MediaGatewayEnvironment = Env & CloudinarySecrets;
+export type MediaGatewayEnvironment = Env & CloudinarySecrets & {
+  readonly APP_CHECK_ENFORCED?: string;
+  readonly RATE_LIMIT_ENFORCED?: string;
+};
 
 export interface TokenVerifier {
   verify(input: {
@@ -23,6 +36,9 @@ export interface TokenVerifier {
     projectId: string;
   }): Promise<string>;
 }
+
+const appCheckVerifier = new FirebaseAppCheckVerifier();
+const rateLimiter = new InMemoryRateLimiter();
 
 export function createWorker(
   tokenVerifier: TokenVerifier,
@@ -43,26 +59,98 @@ export async function handleRequest(
   tokenVerifier: TokenVerifier,
 ): Promise<Response> {
   const url = new URL(request.url);
-  if (
-    request.method !== "POST" ||
-    url.pathname !== "/v1/media/upload-signatures"
-  ) {
+  if (request.method === "GET" && url.pathname === "/health") {
+    return json({ status: "ok", service: "inkstamp-media-gateway" }, 200);
+  }
+
+  const isUploadSignature =
+    request.method === "POST" && url.pathname === "/v1/media/upload-signatures";
+  const isDeliveryUrls =
+    request.method === "POST" && url.pathname === "/v1/media/delivery-urls";
+
+  if (!isUploadSignature && !isDeliveryUrls) {
     return json({ error: "Not found." }, 404);
   }
 
   try {
+    // 1. App Check Verification (if enabled)
+    if (environment.APP_CHECK_ENFORCED === "true") {
+      try {
+        await appCheckVerifier.verify({
+          appCheckHeader: request.headers.get("X-Firebase-App-Check"),
+          projectId: environment.FIREBASE_PROJECT_ID,
+        });
+      } catch (error) {
+        if (error instanceof InvalidAppCheckError) {
+          return json({ error: error.message }, 403);
+        }
+        throw error;
+      }
+    }
+
+    // 2. Auth token Verification
     const userId = await tokenVerifier.verify({
       authorizationHeader: request.headers.get("Authorization"),
       projectId: environment.FIREBASE_PROJECT_ID,
     });
-    const mediaKind = await parseMediaKind(request);
-    const signature = await new CreateUploadSignature(
-      cloudinaryConfiguration(environment),
-      () => Math.floor(Date.now() / 1000),
-      () => crypto.randomUUID(),
-    ).execute({ userId, mediaKind });
 
-    return json(signature, 200);
+    // 3. Rate Limiting (if enabled)
+    if (environment.RATE_LIMIT_ENFORCED === "true") {
+      const ip = request.headers.get("CF-Connecting-IP") || "127.0.0.1";
+      const allowed = await rateLimiter.checkLimit({ ip, userId });
+      if (!allowed) {
+        return json({ error: "Too many requests. Please try again later." }, 429);
+      }
+    }
+
+    // 4. Handle endpoints
+    if (isUploadSignature) {
+      const mediaKind = await parseMediaKind(request);
+      const signature = await new CreateUploadSignature(
+        cloudinaryConfiguration(environment),
+        () => Math.floor(Date.now() / 1000),
+        () => crypto.randomUUID(),
+      ).execute({ userId, mediaKind });
+
+      return json(signature, 200);
+    } else {
+      // isDeliveryUrls
+      const body = await readBoundedJson(request, 2048);
+      if (
+        typeof body !== "object" ||
+        body === null ||
+        !("publicIds" in body) ||
+        !Array.isArray(body.publicIds)
+      ) {
+        throw new InvalidRequestError("publicIds must be an array of strings.");
+      }
+
+      const publicIds = body.publicIds as string[];
+      if (publicIds.length > 50) {
+        throw new InvalidRequestError("Cannot sign more than 50 public IDs at once.");
+      }
+
+      const deliveryUrls: Record<string, string> = {};
+      const cloudName = environment.CLOUDINARY_CLOUD_NAME;
+      const apiSecret = environment.CLOUDINARY_API_SECRET;
+
+      for (const publicId of publicIds) {
+        if (typeof publicId !== "string" || publicId.trim().length === 0) {
+          throw new InvalidRequestError("Invalid publicId format.");
+        }
+        if (!publicId.startsWith("inkstamp/")) {
+          throw new InvalidRequestError("Forbidden publicId namespace.");
+        }
+
+        deliveryUrls[publicId] = await generateDeliveryUrl({
+          cloudName,
+          publicId,
+          apiSecret,
+        });
+      }
+
+      return json({ deliveryUrls }, 200);
+    }
   } catch (error) {
     if (error instanceof InvalidAuthenticationError) {
       return json({ error: "Authentication is required." }, 401);
@@ -77,7 +165,7 @@ export async function handleRequest(
         error: error instanceof Error ? error.message : "Unknown error",
       }),
     );
-    return json({ error: "Unable to create an upload signature." }, 500);
+    return json({ error: "Unable to process the request." }, 500);
   }
 }
 

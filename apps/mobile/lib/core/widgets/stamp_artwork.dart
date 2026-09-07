@@ -4,11 +4,23 @@ import 'package:flutter/material.dart';
 import 'package:inkstamp/app/theme/app_colors.dart';
 import 'package:inkstamp/features/stamps/domain/entities/stamp.dart';
 
+Color _getPaperColor(PaperTone paperTone) {
+  return switch (paperTone) {
+    PaperTone.cream => AppColors.paper,
+    PaperTone.sky => AppColors.sky,
+    PaperTone.blush => AppColors.blush,
+    PaperTone.mint => AppColors.mint,
+    PaperTone.lilac => AppColors.lilac,
+    PaperTone.butter => AppColors.butter,
+  };
+}
+
 class StampArtwork extends StatelessWidget {
   const StampArtwork({
     required this.seed,
     this.frameStyle = StampFrameStyle.classic,
     this.paperTone = PaperTone.cream,
+    this.imageUrl,
     this.heroTag,
     this.showShadow = true,
     super.key,
@@ -17,18 +29,51 @@ class StampArtwork extends StatelessWidget {
   final int seed;
   final StampFrameStyle frameStyle;
   final PaperTone paperTone;
+  final String? imageUrl;
   final Object? heroTag;
   final bool showShadow;
 
   @override
   Widget build(BuildContext context) {
-    final Widget artwork = CustomPaint(
-      painter: StampArtworkPainter(
-        seed: seed,
-        frameStyle: frameStyle,
-        paperTone: paperTone,
+    final Widget artwork = ClipPath(
+      clipper: StampPathClipper(frameStyle: frameStyle),
+      child: AspectRatio(
+        aspectRatio: 1,
+        child: DecoratedBox(
+          decoration: BoxDecoration(color: _getPaperColor(paperTone)),
+          child: imageUrl == null
+              ? CustomPaint(
+                  painter: StampArtworkPainter(
+                    seed: seed,
+                    frameStyle: frameStyle,
+                    paperTone: paperTone,
+                  ),
+                )
+              : LayoutBuilder(
+                  builder: (context, constraints) {
+                    final double inset = constraints.maxWidth * 0.085;
+                    return Padding(
+                      padding: EdgeInsets.all(inset),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(3),
+                        child: Image.network(
+                          imageUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              const Center(child: Icon(Icons.broken_image)),
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return const Center(
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            );
+                          },
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ),
       ),
-      child: const AspectRatio(aspectRatio: 1),
     );
 
     final Widget framed = DecoratedBox(
@@ -55,6 +100,89 @@ class StampArtwork extends StatelessWidget {
   }
 }
 
+class StampPathClipper extends CustomClipper<Path> {
+  const StampPathClipper({required this.frameStyle});
+
+  final StampFrameStyle frameStyle;
+
+  static Path buildStampPath(Size size, StampFrameStyle frameStyle) {
+    final double notch = switch (frameStyle) {
+      StampFrameStyle.classic => size.shortestSide * 0.035,
+      StampFrameStyle.soft => size.shortestSide * 0.045,
+      StampFrameStyle.mini => size.shortestSide * 0.024,
+      StampFrameStyle.bold => size.shortestSide * 0.055,
+    };
+    final int count = switch (frameStyle) {
+      StampFrameStyle.classic => 11,
+      StampFrameStyle.soft => 9,
+      StampFrameStyle.mini => 15,
+      StampFrameStyle.bold => 7,
+    };
+    final Path path = Path()..moveTo(notch, 0);
+    final double horizontalStep = (size.width - notch * 2) / count;
+    for (int index = 0; index < count; index += 1) {
+      final double start = notch + index * horizontalStep;
+      path
+        ..lineTo(start + horizontalStep * 0.25, 0)
+        ..quadraticBezierTo(
+          start + horizontalStep * 0.5,
+          notch,
+          start + horizontalStep * 0.75,
+          0,
+        )
+        ..lineTo(start + horizontalStep, 0);
+    }
+    path.lineTo(size.width, notch);
+    final double verticalStep = (size.height - notch * 2) / count;
+    for (int index = 0; index < count; index += 1) {
+      final double start = notch + index * verticalStep;
+      path
+        ..lineTo(size.width, start + verticalStep * 0.25)
+        ..quadraticBezierTo(
+          size.width - notch,
+          start + verticalStep * 0.5,
+          size.width,
+          start + verticalStep * 0.75,
+        )
+        ..lineTo(size.width, start + verticalStep);
+    }
+    path.lineTo(size.width - notch, size.height);
+    for (int index = count - 1; index >= 0; index -= 1) {
+      final double start = notch + index * horizontalStep;
+      path
+        ..lineTo(start + horizontalStep * 0.75, size.height)
+        ..quadraticBezierTo(
+          start + horizontalStep * 0.5,
+          size.height - notch,
+          start + horizontalStep * 0.25,
+          size.height,
+        )
+        ..lineTo(start, size.height);
+    }
+    path.lineTo(0, size.height - notch);
+    for (int index = count - 1; index >= 0; index -= 1) {
+      final double start = notch + index * verticalStep;
+      path
+        ..lineTo(0, start + verticalStep * 0.75)
+        ..quadraticBezierTo(
+          notch,
+          start + verticalStep * 0.5,
+          0,
+          start + verticalStep * 0.25,
+        )
+        ..lineTo(0, start);
+    }
+    return path..close();
+  }
+
+  @override
+  Path getClip(Size size) => buildStampPath(size, frameStyle);
+
+  @override
+  bool shouldReclip(covariant StampPathClipper oldClipper) =>
+      frameStyle != oldClipper.frameStyle;
+}
+
 class StampArtworkPainter extends CustomPainter {
   const StampArtworkPainter({
     required this.seed,
@@ -66,22 +194,11 @@ class StampArtworkPainter extends CustomPainter {
   final StampFrameStyle frameStyle;
   final PaperTone paperTone;
 
-  Color get _paperColor {
-    return switch (paperTone) {
-      PaperTone.cream => AppColors.paper,
-      PaperTone.sky => AppColors.sky,
-      PaperTone.blush => AppColors.blush,
-      PaperTone.mint => AppColors.mint,
-      PaperTone.lilac => AppColors.lilac,
-      PaperTone.butter => AppColors.butter,
-    };
-  }
-
   @override
   void paint(Canvas canvas, Size size) {
-    final Path stampPath = _buildStampPath(size);
+    final Path stampPath = StampPathClipper.buildStampPath(size, frameStyle);
     canvas.clipPath(stampPath);
-    canvas.drawRect(Offset.zero & size, Paint()..color = _paperColor);
+    canvas.drawRect(Offset.zero & size, Paint()..color = _getPaperColor(paperTone));
 
     final double inset = size.shortestSide * 0.085;
     final Rect photoRect = Rect.fromLTWH(
@@ -160,76 +277,6 @@ class StampArtworkPainter extends CustomPainter {
       silhouette,
     );
     canvas.restore();
-  }
-
-  Path _buildStampPath(Size size) {
-    final double notch = switch (frameStyle) {
-      StampFrameStyle.classic => size.shortestSide * 0.035,
-      StampFrameStyle.soft => size.shortestSide * 0.045,
-      StampFrameStyle.mini => size.shortestSide * 0.024,
-      StampFrameStyle.bold => size.shortestSide * 0.055,
-    };
-    final int count = switch (frameStyle) {
-      StampFrameStyle.classic => 11,
-      StampFrameStyle.soft => 9,
-      StampFrameStyle.mini => 15,
-      StampFrameStyle.bold => 7,
-    };
-    final Path path = Path()..moveTo(notch, 0);
-    final double horizontalStep = (size.width - notch * 2) / count;
-    for (int index = 0; index < count; index += 1) {
-      final double start = notch + index * horizontalStep;
-      path
-        ..lineTo(start + horizontalStep * 0.25, 0)
-        ..quadraticBezierTo(
-          start + horizontalStep * 0.5,
-          notch,
-          start + horizontalStep * 0.75,
-          0,
-        )
-        ..lineTo(start + horizontalStep, 0);
-    }
-    path.lineTo(size.width, notch);
-    final double verticalStep = (size.height - notch * 2) / count;
-    for (int index = 0; index < count; index += 1) {
-      final double start = notch + index * verticalStep;
-      path
-        ..lineTo(size.width, start + verticalStep * 0.25)
-        ..quadraticBezierTo(
-          size.width - notch,
-          start + verticalStep * 0.5,
-          size.width,
-          start + verticalStep * 0.75,
-        )
-        ..lineTo(size.width, start + verticalStep);
-    }
-    path.lineTo(size.width - notch, size.height);
-    for (int index = count - 1; index >= 0; index -= 1) {
-      final double start = notch + index * horizontalStep;
-      path
-        ..lineTo(start + horizontalStep * 0.75, size.height)
-        ..quadraticBezierTo(
-          start + horizontalStep * 0.5,
-          size.height - notch,
-          start + horizontalStep * 0.25,
-          size.height,
-        )
-        ..lineTo(start, size.height);
-    }
-    path.lineTo(0, size.height - notch);
-    for (int index = count - 1; index >= 0; index -= 1) {
-      final double start = notch + index * verticalStep;
-      path
-        ..lineTo(0, start + verticalStep * 0.75)
-        ..quadraticBezierTo(
-          notch,
-          start + verticalStep * 0.5,
-          0,
-          start + verticalStep * 0.25,
-        )
-        ..lineTo(0, start);
-    }
-    return path..close();
   }
 
   @override

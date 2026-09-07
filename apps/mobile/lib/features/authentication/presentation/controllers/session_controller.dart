@@ -1,10 +1,22 @@
+import 'dart:async';
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:inkstamp/features/authentication/data/repositories/firebase_authentication_repository.dart';
 import 'package:inkstamp/features/authentication/data/repositories/in_memory_authentication_repository.dart';
 import 'package:inkstamp/features/authentication/domain/entities/app_user.dart';
 import 'package:inkstamp/features/authentication/domain/repositories/authentication_repository.dart';
 import 'package:inkstamp/features/authentication/domain/use_cases/sign_in.dart';
 
+// ---------------------------------------------------------------------------
+// Session stage
+// ---------------------------------------------------------------------------
+
 enum SessionStage { signedOut, profileSetup, permissions, widgetIntro, ready }
+
+// ---------------------------------------------------------------------------
+// Session state
+// ---------------------------------------------------------------------------
 
 class SessionState {
   const SessionState({
@@ -37,29 +49,111 @@ class SessionState {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Providers
+// ---------------------------------------------------------------------------
+
+/// Whether Firebase has been initialised.  Set to `true` in [bootstrap] after
+/// `Firebase.initializeApp()` succeeds.
+final Provider<bool> firebaseInitializedProvider =
+    Provider<bool>((Ref ref) => false);
+
+/// Resolves to [FirebaseAuthenticationRepository] in production or
+/// [InMemoryAuthenticationRepository] when Firebase is unavailable (demo mode).
 final Provider<AuthenticationRepository> authenticationRepositoryProvider =
-    Provider<AuthenticationRepository>(
-      (Ref ref) => InMemoryAuthenticationRepository(),
-    );
+    Provider<AuthenticationRepository>((Ref ref) {
+  final bool isFirebaseReady = ref.watch(firebaseInitializedProvider);
+  if (isFirebaseReady) {
+    return FirebaseAuthenticationRepository();
+  }
+  return InMemoryAuthenticationRepository();
+});
 
 final NotifierProvider<SessionController, SessionState>
-sessionControllerProvider = NotifierProvider<SessionController, SessionState>(
-  SessionController.new,
-);
+    sessionControllerProvider =
+    NotifierProvider<SessionController, SessionState>(SessionController.new);
+
+// ---------------------------------------------------------------------------
+// Controller
+// ---------------------------------------------------------------------------
 
 class SessionController extends Notifier<SessionState> {
+  StreamSubscription<User?>? _authSubscription;
+
   AuthenticationRepository get _repository {
     return ref.read(authenticationRepositoryProvider);
   }
 
   @override
-  SessionState build() => const SessionState.signedOut();
+  SessionState build() {
+    _listenToAuthChanges();
+    ref.onDispose(() => _authSubscription?.cancel());
+    return const SessionState.signedOut();
+  }
+
+  // ---- Auth state listener -------------------------------------------------
+
+  void _listenToAuthChanges() {
+    final bool isFirebaseReady = ref.read(firebaseInitializedProvider);
+    if (!isFirebaseReady) {
+      return;
+    }
+
+    _authSubscription?.cancel();
+    _authSubscription =
+        FirebaseAuth.instance.authStateChanges().listen((User? firebaseUser) {
+      if (firebaseUser == null) {
+        // User signed out externally (e.g. revoked session).
+        state = const SessionState.signedOut();
+      } else if (state.stage == SessionStage.signedOut && !state.isLoading) {
+        // An existing Firebase session was found on app launch – restore it.
+        _restoreSession(firebaseUser.uid);
+      }
+    });
+  }
+
+  Future<void> _restoreSession(String uid) async {
+    state = state.copyWith(isLoading: true);
+    try {
+      final AuthenticationRepository repo = _repository;
+      if (repo is FirebaseAuthenticationRepository) {
+        // Load profile from Firestore to determine stage.
+        final Stream<AppUser?> stream = repo.authStateChanges();
+        final AppUser? user = await stream.first;
+        if (user != null) {
+          state = SessionState(
+            stage: _stageForUser(user),
+            user: user,
+          );
+          return;
+        }
+      }
+      state = const SessionState.signedOut();
+    } on Object {
+      state = const SessionState.signedOut();
+    }
+  }
+
+  SessionStage _stageForUser(AppUser user) {
+    if (user.username.isEmpty) {
+      return SessionStage.profileSetup;
+    }
+    if (!user.onboardingComplete) {
+      return SessionStage.permissions;
+    }
+    return SessionStage.ready;
+  }
+
+  // ---- Public API ----------------------------------------------------------
 
   Future<void> signIn(SignInProvider provider) async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
       final AppUser user = await SignIn(_repository)(provider);
-      state = SessionState(stage: SessionStage.profileSetup, user: user);
+      state = SessionState(
+        stage: _stageForUser(user),
+        user: user,
+      );
     } on Object {
       state = state.copyWith(
         isLoading: false,

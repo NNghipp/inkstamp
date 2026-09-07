@@ -48,7 +48,8 @@ export const paperToneSchema = z.enum([
 export const publishStampSchema = z
   .object({
     requestId: z.uuid(),
-    draftId: z.string().trim().min(1).max(128),
+    cloudinaryPublicId: z.string().trim().min(1).max(256),
+    cloudinaryThumbnailPublicId: z.string().trim().min(1).max(256),
     audience: audienceModeSchema,
     selectedRecipientIds: z
       .array(z.string().trim().min(1).max(128))

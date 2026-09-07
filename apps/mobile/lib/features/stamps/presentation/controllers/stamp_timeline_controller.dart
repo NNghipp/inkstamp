@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:inkstamp/features/friends/presentation/controllers/friends_controller.dart';
+import 'package:inkstamp/features/stamps/data/repositories/cloudinary_upload_repository.dart';
 import 'package:inkstamp/features/stamps/data/repositories/in_memory_stamp_repository.dart';
 import 'package:inkstamp/features/stamps/domain/entities/stamp.dart';
 import 'package:inkstamp/features/stamps/domain/entities/stamp_draft.dart';
@@ -116,8 +117,22 @@ class StampTimelineController extends Notifier<StampTimelineState> {
 
     state = state.copyWith(isPublishing: true, clearError: true);
     try {
+      StampDraft finalDraft = draft;
+      if (draft.localImagePath != null) {
+        final String pubId = await ref
+            .read(mediaUploadRepositoryProvider)
+            .uploadStamp(draft.localImagePath!);
+        finalDraft = finalDraft.copyWith(cloudinaryPublicId: pubId);
+      }
+      if (draft.localThumbnailPath != null) {
+        final String thumbId = await ref
+            .read(mediaUploadRepositoryProvider)
+            .uploadThumbnail(draft.localThumbnailPath!);
+        finalDraft = finalDraft.copyWith(cloudinaryThumbnailPublicId: thumbId);
+      }
+
       final Stamp stamp = await _repository.publish(
-        draft: draft,
+        draft: finalDraft,
         recipientIds: recipientIds,
       );
       state = state.copyWith(
