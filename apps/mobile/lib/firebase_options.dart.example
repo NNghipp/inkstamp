@@ -1,0 +1,30 @@
+// CI-only placeholder. Local development uses the ignored FlutterFire output.
+import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, kIsWeb, TargetPlatform;
+
+class DefaultFirebaseOptions {
+  static FirebaseOptions get currentPlatform {
+    if (kIsWeb) return android;
+    return switch (defaultTargetPlatform) {
+      TargetPlatform.android => android,
+      TargetPlatform.iOS => ios,
+      _ => throw UnsupportedError('Firebase is not configured on CI host.'),
+    };
+  }
+
+  static const FirebaseOptions android = FirebaseOptions(
+    apiKey: 'ci-placeholder',
+    appId: '1:000000000000:android:ci',
+    messagingSenderId: '000000000000',
+    projectId: 'inkstamp-ci',
+  );
+
+  static const FirebaseOptions ios = FirebaseOptions(
+    apiKey: 'ci-placeholder',
+    appId: '1:000000000000:ios:ci',
+    messagingSenderId: '000000000000',
+    projectId: 'inkstamp-ci',
+    iosBundleId: 'com.inkstamp.app',
+  );
+}
