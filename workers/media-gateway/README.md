@@ -1,8 +1,8 @@
 # Inkstamp media gateway spike
 
 This Cloudflare Worker is an isolated feasibility spike for issuing
-user-scoped Cloudinary authenticated-upload signatures. It is not deployed and
-is not part of the production Inkstamp backend.
+user-scoped Cloudinary authenticated-upload signatures, authorized delivery
+URLs and failed-upload cleanup. It is local-only and is not deployed.
 
 ## Local checks
 
@@ -43,11 +43,17 @@ to 1024 bytes. Successful responses contain public Cloudinary configuration,
 signed upload parameters and an authenticated upload URL. API secrets are
 never returned.
 
+Additional authenticated endpoints:
+
+- `POST /v1/media/delivery-urls` verifies ownership or a Firestore delivery.
+- `POST /v1/media/delete` deletes only an asset inside the caller's namespace.
+
+Set `APP_CHECK_ENFORCED=true` to require `X-Firebase-App-Check`. The in-memory
+upload/delivery limiter is suitable only for one local Worker process.
+
 ## Deployment blockers
 
-- Verify Firebase App Check tokens in addition to Firebase ID tokens.
-- Add per-user and per-IP rate limiting.
-- Add private, short-lived media delivery URL issuance.
+- Replace `InMemoryRateLimiter` with a Durable Object implementation.
 - Approve the Cloudinary account, quotas and retention policy.
 - Add staging and production Worker environments.
 

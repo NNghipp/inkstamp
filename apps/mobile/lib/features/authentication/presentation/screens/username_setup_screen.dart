@@ -57,9 +57,17 @@ class _UsernameSetupScreenState extends ConsumerState<UsernameSetupScreen> {
     setState(() => _usernameStatus = _UsernameStatus.checking);
 
     _debounceTimer = Timer(const Duration(milliseconds: 500), () async {
-      final bool available = await ref
-          .read(authenticationRepositoryProvider)
-          .isUsernameAvailable(raw);
+      bool available;
+      try {
+        available = await ref
+            .read(authenticationRepositoryProvider)
+            .isUsernameAvailable(raw);
+      } on Object {
+        if (mounted) {
+          setState(() => _usernameStatus = _UsernameStatus.idle);
+        }
+        return;
+      }
 
       if (!mounted) {
         return;
@@ -68,8 +76,9 @@ class _UsernameSetupScreenState extends ConsumerState<UsernameSetupScreen> {
       // Guard against stale callback – only apply if the text hasn't changed.
       if (_usernameController.text.trim().toLowerCase() == raw) {
         setState(() {
-          _usernameStatus =
-              available ? _UsernameStatus.available : _UsernameStatus.taken;
+          _usernameStatus = available
+              ? _UsernameStatus.available
+              : _UsernameStatus.taken;
         });
       }
     });
@@ -163,21 +172,21 @@ class _UsernameSetupScreenState extends ConsumerState<UsernameSetupScreen> {
     return switch (_usernameStatus) {
       _UsernameStatus.idle => null,
       _UsernameStatus.checking => const Padding(
-          padding: EdgeInsets.all(12),
-          child: SizedBox(
-            width: 20,
-            height: 20,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
+        padding: EdgeInsets.all(12),
+        child: SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(strokeWidth: 2),
         ),
+      ),
       _UsernameStatus.available => const Icon(
-          Icons.check_circle_rounded,
-          color: AppColors.success,
-        ),
+        Icons.check_circle_rounded,
+        color: AppColors.success,
+      ),
       _UsernameStatus.taken => const Icon(
-          Icons.cancel_rounded,
-          color: AppColors.danger,
-        ),
+        Icons.cancel_rounded,
+        color: AppColors.danger,
+      ),
     };
   }
 

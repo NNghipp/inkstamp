@@ -1,4 +1,6 @@
-﻿import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:inkstamp/app/app.dart';
@@ -14,10 +16,22 @@ Future<void> bootstrap() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
     firebaseReady = true;
-  } on Object catch (e) {
-    // Firebase is not configured (e.g. missing google-services.json).
-    // The app will run in demo mode.
-    debugPrint('Firebase init skipped â€“ running in demo mode: $e');
+  } on Object catch (error) {
+    debugPrint('Firebase init skipped; running in demo mode: $error');
+  }
+  if (firebaseReady) {
+    try {
+      await FirebaseAppCheck.instance.activate(
+        providerAndroid: kDebugMode
+            ? const AndroidDebugProvider()
+            : const AndroidPlayIntegrityProvider(),
+        providerApple: kDebugMode
+            ? const AppleDebugProvider()
+            : const AppleDeviceCheckProvider(),
+      );
+    } on Object catch (error) {
+      debugPrint('Firebase App Check activation failed: $error');
+    }
   }
 
   runApp(

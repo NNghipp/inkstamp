@@ -44,10 +44,35 @@ flutterfire configure --project inkstamp-dev `
   --ios-bundle-id com.inkstamp.app
 ```
 
-Enable Apple and Google providers, Firestore, Storage, Cloud Functions,
+Enable Apple and Google providers, Firestore, Cloud Functions,
 Cloud Messaging, App Check, Analytics and Crashlytics in the Firebase console.
 
-## 3. Run
+Add the SHA-1 and SHA-256 fingerprints from `gradlew signingReport` to the
+Firebase Android app. Download `google-services.json` again and confirm it has
+an Android OAuth client before testing Google Sign-In. Register the App Check
+debug token printed by the Android debug build in Firebase Console.
+
+## 3. Cloudinary media gateway
+
+Cloudinary is the MVP media provider. Create a signed upload preset and place
+the four development values in the ignored
+`workers/media-gateway/.dev.vars` file. Never commit this file.
+
+```powershell
+Set-Location workers/media-gateway
+npm install
+npx wrangler dev
+```
+
+For a physical Android device, install Android SDK platform-tools and run:
+
+```powershell
+adb reverse tcp:8787 tcp:8787
+Set-Location apps/mobile
+flutter run --dart-define=MEDIA_GATEWAY_BASE_URL=http://127.0.0.1:8787
+```
+
+## 4. Run
 
 The UI works with in-memory repositories:
 
@@ -66,7 +91,7 @@ npm test
 npx firebase-tools emulators:start
 ```
 
-## 4. Native widgets
+## 5. Native widgets
 
 Reference implementations live in the iOS and Android platform folders. The
 iOS target requires an App Group named `group.com.inkstamp.app`. Android needs
@@ -75,13 +100,13 @@ the widget receiver declared in the generated application manifest.
 Background delivery is best-effort. Always refresh the shared widget cache
 when the Flutter application resumes.
 
-## 5. Before beta
+## 6. Before beta
 
-- Replace in-memory repositories with Firebase adapters.
-- Add real Apple and Google credentials.
+- Verify Google Sign-In on Android and Apple Sign-In on iOS hardware.
+- Rotate any Cloudinary secret that has appeared outside the local secret file.
+- Replace the Worker's in-memory limiter with Durable Objects before deployment.
 - Configure APNs and FCM.
 - Enable App Check enforcement after debug tokens are registered.
 - Replace placeholder policy/support actions with hosted documents.
 - Confirm `inkstamp.app`, store listings and bundle identifiers are available.
 - Run the full real-device matrix and security Rules emulator suite.
-

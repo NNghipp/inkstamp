@@ -1,100 +1,65 @@
-# Inkstamp - Week 2 Review (Draft)
+# Inkstamp - Week 2-3 Review
 
-## Trạng thái
+Ngày cập nhật: **9 tháng 9 năm 2026**.
 
-**Week 2 đang ở trạng thái gần hoàn tất về mặt code và kiểm tra local, nhưng chưa nên đánh dấu hoàn tất production.**
+## Kết luận
 
-Ngày cập nhật: **7 tháng 9 năm 2026**.
+Week 2-3 đã hoàn thiện phần code và test tự động local cho authentication,
+onboarding, Cloudinary gateway, publish và Firestore Rules. Milestone **chưa
+đóng** vì chưa test trên Android thật. Google provider và Android OAuth client
+đã được cấu hình. Việc rotate Cloudinary secret không phải điều kiện đóng theo
+quyết định của chủ dự án development.
 
-Trong phiên làm việc này, nền tảng Firebase Development đã được nối với project inkstamp-dev, luồng xác thực/session đã được tích hợp vào app, Cloudinary được chọn làm hệ thống lưu trữ media, và media gateway đã chạy được ở local.
+## Đã hoàn thành
 
-## Các hạng mục đã hoàn thành
-
-- Đã xác thực Firebase CLI bằng tài khoản Firebase hiện có.
-- Đã kết nối project Firebase inkstamp-dev.
-- Đã đăng ký Firebase Android app với package com.inkstamp.app.
-- Đã đăng ký Firebase iOS app với bundle ID com.inkstamp.app.
-- Đã sinh cấu hình FlutterFire cho Android và iOS.
-- Đã nối Firebase.initializeApp() với DefaultFirebaseOptions.currentPlatform.
-- Đã bật cấu hình Google Services trong Android Gradle.
-- Đã thêm session-driven routing và khôi phục session Firebase khi app khởi động.
-- Đã cập nhật Google Sign-In theo API google_sign_in 7.2.0.
-- Đã giữ demo mode khi Firebase chưa sẵn sàng để app vẫn chạy local.
-- Đã chuyển media model từ Firebase Storage draft path sang Cloudinary public ID.
-- Đã thêm repository upload stamp và thumbnail lên Cloudinary thông qua signed upload gateway.
-- Đã thêm signed delivery URL cho ảnh private.
-- Đã thêm kiểm tra Firebase ID token trong media gateway.
-- Đã thêm kiểm tra Firebase App Check khi được bật.
-- Đã thêm rate limiting theo IP và user ở mức local prototype.
-- Đã thêm route kiểm tra GET /health cho media gateway.
-- Đã cập nhật publish validation để kiểm tra Cloudinary public ID thuộc sender và đúng namespace.
+- Firebase Android app khớp `com.inkstamp.app`; SHA-1 và SHA-256 debug đã đăng ký.
+- Google provider đã bật; Android và Web OAuth client đã có trong cấu hình mới.
+- Session restore và router đọc profile/onboarding thật từ Firestore.
+- Trạng thái permissions/widget intro được lưu bằng callable Function.
+- Username được chuẩn hóa và reserve bằng Firestore transaction.
+- Firebase repository không tự rơi về demo khi đăng nhập/upload lỗi.
+- Media gateway kiểm tra Firebase ID token, App Check, config và rate limit.
+- Upload dùng authenticated Cloudinary asset, URL gateway lấy từ
+  `MEDIA_GATEWAY_BASE_URL`.
+- App gửi ID token và App Check token, giới hạn JPEG 5 MB và timeout.
+- Upload lỗi một phần được cleanup qua endpoint chỉ cho phép asset thuộc UID.
+- Publish dùng request ID xác định theo cặp asset để retry không tạo stamp trùng.
+- Stamp/delivery được lưu Firestore; delivery URL chỉ cấp sau kiểm tra quyền.
+- App cache delivery URL trong 4 phút và tự xin lại sau khi cache hết hạn.
+- In-memory repository chỉ còn dùng khi Firebase không được cấu hình (demo/test).
+- Firestore Emulator xác nhận client không thể tự ghi username/profile và không
+  thể đọc delivery của user khác.
 
 ## Kiểm tra đã chạy
 
-| Kiểm tra | Kết quả |
-|---|---|
-| flutter analyze | Pass, không còn issue |
-| flutter test | Pass, 13 tests |
-| Android debug APK | Build thành công |
-| Functions ESLint | Pass |
-| Functions tests | Pass, 8 tests |
-| Functions TypeScript build | Pass |
-| Media gateway tests | Pass, 13 tests |
-| Wrangler TypeScript/build check | Pass |
-| Wrangler deploy dry-run | Pass |
-| Media gateway GET /health local | 200 OK |
-| Media gateway không có Auth token | 401 Unauthorized, đúng kỳ vọng |
-| git diff --check | Pass, còn cảnh báo CRLF hiện hữu |
+Kết quả chi tiết và bằng chứng nằm trong [testcase.md](testcase.md). Các quality
+gate tự động đã pass: Flutter analyze/test, Functions lint/test/build, Firestore
+Rules Emulator, Worker test/check và `git diff --check`. Android APK được build
+lại trong lần kiểm tra cuối.
 
-APK debug được tạo tại: apps/mobile/build/app/outputs/flutter-apk/app-debug.apk
+## Bug đã sửa
 
-## Lỗi đã phát hiện và sửa
+- App Check khởi tạo lỗi từng làm app rơi về demo dù Firebase đã sẵn sàng.
+- Session chỉ giữ onboarding trong memory nên restart mở sai màn hình.
+- Lỗi đăng nhập bị gom thành một thông báo chung.
+- Upload repository từng có thể trả public ID giả trong luồng Firebase.
+- Public ID từ Cloudinary chưa được đối chiếu với public ID đã ký.
+- Publish retry từng tạo request ID mới.
+- Delivery URL từng được ký chỉ từ public ID client gửi, chưa kiểm tra quyền.
+- Rate limit từng dùng chung quota upload và delivery, thiếu `Retry-After`.
+- Upload/publish thất bại có thể để lại asset rác.
 
-- Sửa API Google Sign-In cũ không tương thích với phiên bản 7.2.0.
-- Sửa provider Firebase initialization không tương thích Riverpod 3.
-- Sửa test app thiếu ProviderScope.
-- Sửa tham chiếu màu không tồn tại AppColors.stamp.
-- Sửa import ordering để Flutter analyzer không còn issue.
-- Sửa media gateway để có route health kiểm tra local rõ ràng.
-- Cập nhật test route không tồn tại sau khi thêm /health.
+## Việc còn chặn milestone
 
-## Giới hạn và việc chưa hoàn tất
+1. Xác nhận preset trong Cloudinary Console là signed/authenticated.
+2. Kết nối Android thật và bật USB debugging. `adb.exe` đã có trong Android SDK
+   nhưng chưa nằm trong `PATH`; hiện `adb devices` chưa thấy thiết bị.
+3. Chạy end-to-end trên Android thật: sign-in, onboarding, upload, publish,
+   delivery, offline/resume và sign-out.
+4. Apple Sign-In/iOS device QA chờ macOS/Xcode.
+5. Trước khi deploy Worker public, thay `InMemoryRateLimiter` bằng Durable Object.
 
-- Chưa test upload Cloudinary thật từ app vì chưa có Firebase ID token của user đăng nhập thật trong phiên local.
-- Chưa xác nhận Google Sign-In trên thiết bị Android thật.
-- Chưa xác nhận Apple Sign-In trên iOS thật.
-- Chưa build/test iOS vì môi trường hiện tại là Windows và cần macOS/Xcode.
-- Rate limiter hiện là InMemoryRateLimiter, chưa phù hợp production multi-instance. Cần thay bằng Durable Object hoặc KV.
-- Cloudinary API secret đã từng được gửi trong cuộc trò chuyện; cần regenerate secret trước khi sử dụng tiếp.
-- firebase_options.dart, google-services.json và Cloudinary .dev.vars đang được gitignore theo chủ đích.
-- Chưa deploy Worker production. Wrangler mới chỉ chạy local và dry-run.
-- Chưa chạy Firebase Emulator integration tests cho Auth/Firestore/Functions.
+Cloudinary secret đã xuất hiện ngoài file local. Chủ dự án chấp nhận rủi ro này
+cho development; tuyệt đối không tái sử dụng secret đó cho production.
 
-## Đánh giá milestone
-
-| Phạm vi | Trạng thái |
-|---|---|
-| Firebase project và app registration | Hoàn tất |
-| Firebase Flutter configuration | Hoàn tất local |
-| Session và onboarding routing | Hoàn tất ở mức code/test local |
-| Cloudinary upload gateway | Hoàn tất ở mức code/local test |
-| Cloudinary upload thật | Chưa xác nhận |
-| Google/Apple Sign-In thiết bị thật | Chưa xác nhận |
-| Production rate limiting | Chưa hoàn tất |
-| iOS build/device test | Chưa thực hiện |
-
-## Điều kiện để đóng Week 2
-
-1. Regenerate Cloudinary API secret và cập nhật workers/media-gateway/.dev.vars.
-2. Đăng nhập app bằng Firebase thật trên Android để lấy ID token runtime.
-3. Test upload stamp và thumbnail thật lên Cloudinary.
-4. Test publish stamp và lưu public ID vào Firestore.
-5. Test Google Sign-In trên Android thật.
-6. Test Apple Sign-In trên iOS/macOS.
-7. Thay in-memory rate limiter bằng cơ chế phân tán.
-8. Chạy Firebase Emulator integration tests.
-9. Review thay đổi, commit vào nhánh Week 2 và tạo Pull Request.
-
-## Quyết định hiện tại
-
-**Chưa commit và chưa push.** File này là draft để review trước khi tạo commit GitHub.
+Không có Worker, Functions production hay app store deployment trong milestone này.

@@ -12,9 +12,9 @@ actual Jira project key during synchronization.
 | `INK-LOCAL-002` | Bug | Medium | Fixed | English-first widget test lacked ProviderScope |
 | `INK-LOCAL-003` | Bug | High | Fixed | Media gateway TypeScript files contained Dart syntax |
 | `INK-LOCAL-004` | Bug | High | Fixed | Media gateway used the generic upload endpoint for authenticated assets |
-| `INK-LOCAL-005` | Security | Highest | Open | Media gateway does not verify Firebase App Check tokens |
+| `INK-LOCAL-005` | Security | Highest | Fixed | Media gateway verifies Firebase App Check tokens |
 | `INK-LOCAL-006` | Security | High | Open | Media gateway has no distributed rate limiting |
-| `INK-LOCAL-007` | Task | High | Blocked | Real Firebase Apple/Google authentication needs approved project configuration |
+| `INK-LOCAL-007` | Task | High | In Progress | Android device verification is incomplete |
 | `INK-LOCAL-008` | Maintenance | Medium | Open | Firebase plugins still apply the legacy Kotlin Gradle Plugin |
 | `INK-LOCAL-009` | Security | Medium | Fixed | Firebase Functions resolved a vulnerable transitive uuid version |
 
@@ -56,8 +56,9 @@ actual Jira project key during synchronization.
 
 ### `INK-LOCAL-005`
 
-Production deployment is blocked until every media-signature request verifies
-both a Firebase ID token and a valid App Check token.
+Implemented for upload, delivery and cleanup endpoints. App Check enforcement
+is controlled by `APP_CHECK_ENFORCED`; local debug builds activate the Firebase
+debug provider.
 
 ### `INK-LOCAL-006`
 
@@ -67,9 +68,9 @@ because Worker isolates are reused and not globally consistent.
 
 ### `INK-LOCAL-007`
 
-The mobile foundation remains in demo/in-memory mode. Real Apple/Google sign-in
-requires owner-approved Firebase projects, app registrations and credentials.
-No credential or billing change will be made without explicit approval.
+Firebase project/app registration, Android SHA fingerprints, Google provider,
+and Android/Web OAuth clients are configured. The refreshed ignored
+`google-services.json` builds successfully. Android device verification remains.
 
 ### `INK-LOCAL-008`
 

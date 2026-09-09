@@ -57,7 +57,8 @@ class StampDraft {
       localImagePath: localImagePath ?? this.localImagePath,
       localThumbnailPath: localThumbnailPath ?? this.localThumbnailPath,
       cloudinaryPublicId: cloudinaryPublicId ?? this.cloudinaryPublicId,
-      cloudinaryThumbnailPublicId: cloudinaryThumbnailPublicId ?? this.cloudinaryThumbnailPublicId,
+      cloudinaryThumbnailPublicId:
+          cloudinaryThumbnailPublicId ?? this.cloudinaryThumbnailPublicId,
     );
   }
 }

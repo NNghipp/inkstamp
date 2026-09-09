@@ -132,6 +132,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                       seed: stamp.seed,
                       frameStyle: stamp.frameStyle,
                       paperTone: stamp.paperTone,
+                      publicId: stamp.cloudinaryThumbnailPublicId,
                       showShadow: false,
                     ),
                   ),
@@ -195,6 +196,7 @@ class _CalendarDay extends StatelessWidget {
                 seed: stamp!.seed,
                 frameStyle: stamp!.frameStyle,
                 paperTone: stamp!.paperTone,
+                publicId: stamp!.cloudinaryThumbnailPublicId,
                 showShadow: false,
               ),
             )

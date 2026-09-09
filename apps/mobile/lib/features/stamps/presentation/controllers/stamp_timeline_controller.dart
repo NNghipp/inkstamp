@@ -1,9 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:inkstamp/features/authentication/presentation/controllers/session_controller.dart';
 import 'package:inkstamp/features/friends/presentation/controllers/friends_controller.dart';
 import 'package:inkstamp/features/stamps/data/repositories/cloudinary_upload_repository.dart';
+import 'package:inkstamp/features/stamps/data/repositories/firebase_stamp_repository.dart';
 import 'package:inkstamp/features/stamps/data/repositories/in_memory_stamp_repository.dart';
 import 'package:inkstamp/features/stamps/domain/entities/stamp.dart';
 import 'package:inkstamp/features/stamps/domain/entities/stamp_draft.dart';
+import 'package:inkstamp/features/stamps/domain/repositories/media_upload_repository.dart';
 import 'package:inkstamp/features/stamps/domain/repositories/stamp_repository.dart';
 
 class StampTimelineState {
@@ -40,7 +43,11 @@ class StampTimelineState {
 }
 
 final Provider<StampRepository> stampRepositoryProvider =
-    Provider<StampRepository>((Ref ref) => InMemoryStampRepository());
+    Provider<StampRepository>((Ref ref) {
+      return ref.watch(firebaseInitializedProvider)
+          ? FirebaseStampRepository()
+          : InMemoryStampRepository();
+    });
 
 final NotifierProvider<StampTimelineController, StampTimelineState>
 stampTimelineControllerProvider =
@@ -116,18 +123,22 @@ class StampTimelineController extends Notifier<StampTimelineState> {
     }
 
     state = state.copyWith(isPublishing: true, clearError: true);
+    final MediaUploadRepository uploads = ref.read(
+      mediaUploadRepositoryProvider,
+    );
+    final List<String> uploadedPublicIds = <String>[];
     try {
       StampDraft finalDraft = draft;
       if (draft.localImagePath != null) {
-        final String pubId = await ref
-            .read(mediaUploadRepositoryProvider)
-            .uploadStamp(draft.localImagePath!);
+        final String pubId = await uploads.uploadStamp(draft.localImagePath!);
+        uploadedPublicIds.add(pubId);
         finalDraft = finalDraft.copyWith(cloudinaryPublicId: pubId);
       }
       if (draft.localThumbnailPath != null) {
-        final String thumbId = await ref
-            .read(mediaUploadRepositoryProvider)
-            .uploadThumbnail(draft.localThumbnailPath!);
+        final String thumbId = await uploads.uploadThumbnail(
+          draft.localThumbnailPath!,
+        );
+        uploadedPublicIds.add(thumbId);
         finalDraft = finalDraft.copyWith(cloudinaryThumbnailPublicId: thumbId);
       }
 
@@ -140,10 +151,19 @@ class StampTimelineController extends Notifier<StampTimelineState> {
         isPublishing: false,
       );
       return stamp;
-    } on Object {
+    } on Object catch (error) {
+      for (final String publicId in uploadedPublicIds) {
+        try {
+          await uploads.delete(publicId);
+        } on Object {
+          // Preserve the original publish error; cleanup can be retried later.
+        }
+      }
       state = state.copyWith(
         isPublishing: false,
-        errorMessage: 'Unable to send this stamp. Please try again.',
+        errorMessage: error is MediaUploadException
+            ? error.message
+            : 'Unable to send this stamp. Please try again.',
       );
       return null;
     }

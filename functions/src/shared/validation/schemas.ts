@@ -11,6 +11,10 @@ export const reserveUsernameSchema = z.object({
   displayName: z.string().trim().min(1).max(30),
 });
 
+export const onboardingStepSchema = z.object({
+  step: z.enum(["widgetIntro", "complete"]),
+});
+
 export const usernameLookupSchema = z.object({
   username: usernameSchema,
 });

@@ -101,6 +101,7 @@ class _StampDetailScreenState extends ConsumerState<StampDetailScreen> {
               seed: stamp.seed,
               frameStyle: stamp.frameStyle,
               paperTone: stamp.paperTone,
+              publicId: stamp.cloudinaryPublicId,
               heroTag: 'stamp-${stamp.id}',
             ),
           ),

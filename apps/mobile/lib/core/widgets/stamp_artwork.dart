@@ -1,7 +1,9 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:inkstamp/app/theme/app_colors.dart';
+import 'package:inkstamp/features/stamps/data/repositories/cloudinary_delivery_repository.dart';
 import 'package:inkstamp/features/stamps/domain/entities/stamp.dart';
 
 Color _getPaperColor(PaperTone paperTone) {
@@ -15,12 +17,13 @@ Color _getPaperColor(PaperTone paperTone) {
   };
 }
 
-class StampArtwork extends StatelessWidget {
+class StampArtwork extends ConsumerWidget {
   const StampArtwork({
     required this.seed,
     this.frameStyle = StampFrameStyle.classic,
     this.paperTone = PaperTone.cream,
     this.imageUrl,
+    this.publicId,
     this.heroTag,
     this.showShadow = true,
     super.key,
@@ -30,18 +33,23 @@ class StampArtwork extends StatelessWidget {
   final StampFrameStyle frameStyle;
   final PaperTone paperTone;
   final String? imageUrl;
+  final String? publicId;
   final Object? heroTag;
   final bool showShadow;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final AsyncValue<String>? delivery = publicId == null
+        ? null
+        : ref.watch(mediaDeliveryUrlProvider(publicId!));
+    final String? resolvedImageUrl = imageUrl ?? delivery?.value;
     final Widget artwork = ClipPath(
       clipper: StampPathClipper(frameStyle: frameStyle),
       child: AspectRatio(
         aspectRatio: 1,
         child: DecoratedBox(
           decoration: BoxDecoration(color: _getPaperColor(paperTone)),
-          child: imageUrl == null
+          child: resolvedImageUrl == null && delivery?.isLoading != true
               ? CustomPaint(
                   painter: StampArtworkPainter(
                     seed: seed,
@@ -56,18 +64,31 @@ class StampArtwork extends StatelessWidget {
                       padding: EdgeInsets.all(inset),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(3),
-                        child: Image.network(
-                          imageUrl!,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) =>
-                              const Center(child: Icon(Icons.broken_image)),
-                          loadingBuilder: (context, child, loadingProgress) {
-                            if (loadingProgress == null) return child;
-                            return const Center(
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            );
-                          },
-                        ),
+                        child: delivery?.hasError == true
+                            ? const Center(child: Icon(Icons.broken_image))
+                            : delivery?.isLoading == true
+                            ? const Center(
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Image.network(
+                                resolvedImageUrl!,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    const Center(
+                                      child: Icon(Icons.broken_image),
+                                    ),
+                                loadingBuilder:
+                                    (context, child, loadingProgress) {
+                                      if (loadingProgress == null) return child;
+                                      return const Center(
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      );
+                                    },
+                              ),
                       ),
                     );
                   },
@@ -198,7 +219,10 @@ class StampArtworkPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final Path stampPath = StampPathClipper.buildStampPath(size, frameStyle);
     canvas.clipPath(stampPath);
-    canvas.drawRect(Offset.zero & size, Paint()..color = _getPaperColor(paperTone));
+    canvas.drawRect(
+      Offset.zero & size,
+      Paint()..color = _getPaperColor(paperTone),
+    );
 
     final double inset = size.shortestSide * 0.085;
     final Rect photoRect = Rect.fromLTWH(

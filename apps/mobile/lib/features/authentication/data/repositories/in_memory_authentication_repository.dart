@@ -5,6 +5,9 @@ class InMemoryAuthenticationRepository implements AuthenticationRepository {
   final Set<String> _reservedUsernames = <String>{'mai', 'linh', 'minh', 'an'};
 
   @override
+  Stream<AppUser?> authStateChanges() => const Stream<AppUser?>.empty();
+
+  @override
   Future<void> deleteAccount() async {}
 
   @override
@@ -35,6 +38,15 @@ class InMemoryAuthenticationRepository implements AuthenticationRepository {
       displayName: displayName,
     );
   }
+
+  @override
+  Future<AppUser> updateOnboardingStep({
+    required AppUser user,
+    required UserOnboardingStep step,
+  }) async => user.copyWith(
+    onboardingStep: step,
+    onboardingComplete: step == UserOnboardingStep.complete,
+  );
 
   Future<AppUser> _demoSignIn() async {
     await Future<void>.delayed(const Duration(milliseconds: 420));

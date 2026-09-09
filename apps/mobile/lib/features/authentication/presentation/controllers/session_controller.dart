@@ -55,23 +55,25 @@ class SessionState {
 
 /// Whether Firebase has been initialised.  Set to `true` in [bootstrap] after
 /// `Firebase.initializeApp()` succeeds.
-final Provider<bool> firebaseInitializedProvider =
-    Provider<bool>((Ref ref) => false);
+final Provider<bool> firebaseInitializedProvider = Provider<bool>(
+  (Ref ref) => false,
+);
 
 /// Resolves to [FirebaseAuthenticationRepository] in production or
 /// [InMemoryAuthenticationRepository] when Firebase is unavailable (demo mode).
 final Provider<AuthenticationRepository> authenticationRepositoryProvider =
     Provider<AuthenticationRepository>((Ref ref) {
-  final bool isFirebaseReady = ref.watch(firebaseInitializedProvider);
-  if (isFirebaseReady) {
-    return FirebaseAuthenticationRepository();
-  }
-  return InMemoryAuthenticationRepository();
-});
+      final bool isFirebaseReady = ref.watch(firebaseInitializedProvider);
+      if (isFirebaseReady) {
+        return FirebaseAuthenticationRepository();
+      }
+      return InMemoryAuthenticationRepository();
+    });
 
 final NotifierProvider<SessionController, SessionState>
-    sessionControllerProvider =
-    NotifierProvider<SessionController, SessionState>(SessionController.new);
+sessionControllerProvider = NotifierProvider<SessionController, SessionState>(
+  SessionController.new,
+);
 
 // ---------------------------------------------------------------------------
 // Controller
@@ -100,8 +102,9 @@ class SessionController extends Notifier<SessionState> {
     }
 
     _authSubscription?.cancel();
-    _authSubscription =
-        FirebaseAuth.instance.authStateChanges().listen((User? firebaseUser) {
+    _authSubscription = FirebaseAuth.instance.authStateChanges().listen((
+      User? firebaseUser,
+    ) {
       if (firebaseUser == null) {
         // User signed out externally (e.g. revoked session).
         state = const SessionState.signedOut();
@@ -115,18 +118,10 @@ class SessionController extends Notifier<SessionState> {
   Future<void> _restoreSession(String uid) async {
     state = state.copyWith(isLoading: true);
     try {
-      final AuthenticationRepository repo = _repository;
-      if (repo is FirebaseAuthenticationRepository) {
-        // Load profile from Firestore to determine stage.
-        final Stream<AppUser?> stream = repo.authStateChanges();
-        final AppUser? user = await stream.first;
-        if (user != null) {
-          state = SessionState(
-            stage: _stageForUser(user),
-            user: user,
-          );
-          return;
-        }
+      final AppUser? user = await _repository.authStateChanges().first;
+      if (user != null) {
+        state = SessionState(stage: _stageForUser(user), user: user);
+        return;
       }
       state = const SessionState.signedOut();
     } on Object {
@@ -135,13 +130,12 @@ class SessionController extends Notifier<SessionState> {
   }
 
   SessionStage _stageForUser(AppUser user) {
-    if (user.username.isEmpty) {
-      return SessionStage.profileSetup;
-    }
-    if (!user.onboardingComplete) {
-      return SessionStage.permissions;
-    }
-    return SessionStage.ready;
+    return switch (user.onboardingStep) {
+      UserOnboardingStep.profile => SessionStage.profileSetup,
+      UserOnboardingStep.permissions => SessionStage.permissions,
+      UserOnboardingStep.widgetIntro => SessionStage.widgetIntro,
+      UserOnboardingStep.complete => SessionStage.ready,
+    };
   }
 
   // ---- Public API ----------------------------------------------------------
@@ -150,9 +144,20 @@ class SessionController extends Notifier<SessionState> {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
       final AppUser user = await SignIn(_repository)(provider);
-      state = SessionState(
-        stage: _stageForUser(user),
-        user: user,
+      state = SessionState(stage: _stageForUser(user), user: user);
+    } on AuthenticationException catch (error) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: switch (error.failure) {
+          AuthenticationFailure.cancelled => 'Sign-in was cancelled.',
+          AuthenticationFailure.network =>
+            'Check your connection and try again.',
+          AuthenticationFailure.disabled => 'This account has been disabled.',
+          AuthenticationFailure.providerConfiguration =>
+            'Sign-in is not configured correctly for this app.',
+          AuthenticationFailure.unknown =>
+            'Unable to sign in. Please try again.',
+        },
       );
     } on Object {
       state = state.copyWith(
@@ -172,34 +177,74 @@ class SessionController extends Notifier<SessionState> {
     }
 
     state = state.copyWith(isLoading: true, clearError: true);
-    final bool available = await _repository.isUsernameAvailable(username);
-    if (!available) {
+    try {
+      final bool available = await _repository.isUsernameAvailable(username);
+      if (!available) {
+        state = state.copyWith(
+          isLoading: false,
+          errorMessage: 'This username is already taken.',
+        );
+        return false;
+      }
+
+      final AppUser updated = await _repository.updateProfile(
+        user: user,
+        username: username,
+        displayName: displayName,
+      );
+      state = SessionState(stage: SessionStage.permissions, user: updated);
+      return true;
+    } on Object {
       state = state.copyWith(
         isLoading: false,
-        errorMessage: 'This username is already taken.',
+        errorMessage: 'Unable to save your profile. Please try again.',
       );
       return false;
     }
-
-    final AppUser updated = await _repository.updateProfile(
-      user: user,
-      username: username,
-      displayName: displayName,
-    );
-    state = SessionState(stage: SessionStage.permissions, user: updated);
-    return true;
   }
 
-  void completePermissions() {
-    state = state.copyWith(stage: SessionStage.widgetIntro);
-  }
-
-  void completeOnboarding() {
+  Future<void> completePermissions() async {
     final AppUser? user = state.user;
-    state = state.copyWith(
-      stage: SessionStage.ready,
-      user: user?.copyWith(onboardingComplete: true),
-    );
+    if (user == null) return;
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      final AppUser updated = await _repository.updateOnboardingStep(
+        user: user,
+        step: UserOnboardingStep.widgetIntro,
+      );
+      state = state.copyWith(
+        stage: SessionStage.widgetIntro,
+        user: updated,
+        isLoading: false,
+      );
+    } on Object {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: 'Unable to save permissions. Please try again.',
+      );
+    }
+  }
+
+  Future<void> completeOnboarding() async {
+    final AppUser? user = state.user;
+    if (user == null) return;
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      final AppUser updated = await _repository.updateOnboardingStep(
+        user: user,
+        step: UserOnboardingStep.complete,
+      );
+      state = state.copyWith(
+        stage: SessionStage.ready,
+        user: updated,
+        isLoading: false,
+      );
+    } on Object {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: 'Unable to finish onboarding. Please try again.',
+      );
+    }
   }
 
   void updateDisplayName(String displayName) {

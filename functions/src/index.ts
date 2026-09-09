@@ -18,3 +18,5 @@ export {
 } from "./modules/stamps/manage-stamps.js";
 export { publishStamp } from "./modules/stamps/publish-stamp.js";
 export { reserveUsername } from "./modules/users/reserve-username.js";
+export { checkUsernameAvailability } from "./modules/users/check-username-availability.js";
+export { updateOnboardingStep } from "./modules/users/update-onboarding-step.js";

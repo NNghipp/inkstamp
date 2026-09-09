@@ -55,6 +55,7 @@ export const reserveUsername = onCall(
             displayName: input.displayName,
             usernameNormalized: username,
             onboardingComplete: false,
+            onboardingStep: "permissions",
             updatedAt: FieldValue.serverTimestamp(),
             createdAt: previousCreatedAt ?? FieldValue.serverTimestamp(),
           },

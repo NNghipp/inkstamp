@@ -70,7 +70,8 @@ class Stamp {
       replyToStampId: replyToStampId,
       isSeen: isSeen ?? this.isSeen,
       cloudinaryPublicId: cloudinaryPublicId ?? this.cloudinaryPublicId,
-      cloudinaryThumbnailPublicId: cloudinaryThumbnailPublicId ?? this.cloudinaryThumbnailPublicId,
+      cloudinaryThumbnailPublicId:
+          cloudinaryThumbnailPublicId ?? this.cloudinaryThumbnailPublicId,
     );
   }
 }

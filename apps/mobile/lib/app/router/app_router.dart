@@ -55,15 +55,13 @@ const Set<String> _onboardingPaths = <String>{
 // ---------------------------------------------------------------------------
 
 final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((Ref ref) {
-  final SessionRedirectNotifier redirectNotifier =
-      SessionRedirectNotifier(ref);
+  final SessionRedirectNotifier redirectNotifier = SessionRedirectNotifier(ref);
 
   return GoRouter(
     initialLocation: AppRoutes.splash,
     refreshListenable: redirectNotifier,
     redirect: (context, state) {
-      final SessionStage stage =
-          ref.read(sessionControllerProvider).stage;
+      final SessionStage stage = ref.read(sessionControllerProvider).stage;
       final String location = state.matchedLocation;
 
       // Never redirect while on the splash screen – it auto-navigates.

@@ -11,9 +11,9 @@ class FirebaseAuthenticationRepository implements AuthenticationRepository {
     FirebaseAuth? auth,
     FirebaseFirestore? firestore,
     FirebaseFunctions? functions,
-  })  : _auth = auth ?? FirebaseAuth.instance,
-        _firestore = firestore ?? FirebaseFirestore.instance,
-        _functions = functions ?? FirebaseFunctions.instance;
+  }) : _auth = auth ?? FirebaseAuth.instance,
+       _firestore = firestore ?? FirebaseFirestore.instance,
+       _functions = functions ?? FirebaseFunctions.instance;
 
   final FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
@@ -26,39 +26,61 @@ class FirebaseAuthenticationRepository implements AuthenticationRepository {
 
   @override
   Future<AppUser> signInWithGoogle() async {
-    final GoogleSignIn googleSignIn = GoogleSignIn.instance;
-    _googleInitialization ??= googleSignIn.initialize();
-    await _googleInitialization;
-
-    final GoogleSignInAccount googleUser = await googleSignIn.authenticate();
-    final GoogleSignInAuthentication googleAuth = googleUser.authentication;
-    final OAuthCredential credential = GoogleAuthProvider.credential(
-      idToken: googleAuth.idToken,
-    );
-
-    final UserCredential userCredential =
-        await _auth.signInWithCredential(credential);
-    return _userFromFirebase(userCredential.user);
+    try {
+      final GoogleSignIn googleSignIn = GoogleSignIn.instance;
+      _googleInitialization ??= googleSignIn.initialize();
+      await _googleInitialization;
+      final GoogleSignInAccount googleUser = await googleSignIn.authenticate();
+      final GoogleSignInAuthentication googleAuth = googleUser.authentication;
+      final OAuthCredential credential = GoogleAuthProvider.credential(
+        idToken: googleAuth.idToken,
+      );
+      final UserCredential userCredential = await _auth.signInWithCredential(
+        credential,
+      );
+      return await _userFromFirebase(userCredential.user);
+    } on GoogleSignInException catch (error) {
+      if (error.code == GoogleSignInExceptionCode.canceled) {
+        throw const AuthenticationException(AuthenticationFailure.cancelled);
+      }
+      throw const AuthenticationException(
+        AuthenticationFailure.providerConfiguration,
+      );
+    } on FirebaseAuthException catch (error) {
+      throw _mapFirebaseAuthException(error);
+    }
   }
 
   @override
   Future<AppUser> signInWithApple() async {
-    final AuthorizationCredentialAppleID appleCredential =
-        await SignInWithApple.getAppleIDCredential(
-      scopes: <AppleIDAuthorizationScopes>[
-        AppleIDAuthorizationScopes.email,
-        AppleIDAuthorizationScopes.fullName,
-      ],
-    );
+    try {
+      final AuthorizationCredentialAppleID appleCredential =
+          await SignInWithApple.getAppleIDCredential(
+            scopes: <AppleIDAuthorizationScopes>[
+              AppleIDAuthorizationScopes.email,
+              AppleIDAuthorizationScopes.fullName,
+            ],
+          );
 
-    final OAuthCredential credential = OAuthProvider('apple.com').credential(
-      idToken: appleCredential.identityToken,
-      accessToken: appleCredential.authorizationCode,
-    );
+      final OAuthCredential credential = OAuthProvider('apple.com').credential(
+        idToken: appleCredential.identityToken,
+        accessToken: appleCredential.authorizationCode,
+      );
 
-    final UserCredential userCredential =
-        await _auth.signInWithCredential(credential);
-    return _userFromFirebase(userCredential.user);
+      final UserCredential userCredential = await _auth.signInWithCredential(
+        credential,
+      );
+      return await _userFromFirebase(userCredential.user);
+    } on SignInWithAppleAuthorizationException catch (error) {
+      if (error.code == AuthorizationErrorCode.canceled) {
+        throw const AuthenticationException(AuthenticationFailure.cancelled);
+      }
+      throw const AuthenticationException(
+        AuthenticationFailure.providerConfiguration,
+      );
+    } on FirebaseAuthException catch (error) {
+      throw _mapFirebaseAuthException(error);
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -72,16 +94,10 @@ class FirebaseAuthenticationRepository implements AuthenticationRepository {
       return false;
     }
 
-    final DocumentSnapshot<Map<String, dynamic>> snapshot =
-        await _firestore.doc('usernames/$normalized').get();
-    if (!snapshot.exists) {
-      return true;
-    }
-
-    // If the current user already owns this username, it is still "available"
-    // for them.
-    final String? ownerId = snapshot.data()?['userId'] as String?;
-    return ownerId == _auth.currentUser?.uid;
+    final HttpsCallableResult<Map<String, dynamic>> result = await _functions
+        .httpsCallable('checkUsernameAvailability')
+        .call<Map<String, dynamic>>(<String, String>{'username': normalized});
+    return result.data['available'] == true;
   }
 
   // ---------------------------------------------------------------------------
@@ -103,6 +119,22 @@ class FirebaseAuthenticationRepository implements AuthenticationRepository {
     return user.copyWith(
       username: username.toLowerCase(),
       displayName: displayName,
+      onboardingStep: UserOnboardingStep.permissions,
+    );
+  }
+
+  @override
+  Future<AppUser> updateOnboardingStep({
+    required AppUser user,
+    required UserOnboardingStep step,
+  }) async {
+    final HttpsCallable callable = _functions.httpsCallable(
+      'updateOnboardingStep',
+    );
+    await callable.call<dynamic>(<String, String>{'step': step.name});
+    return user.copyWith(
+      onboardingStep: step,
+      onboardingComplete: step == UserOnboardingStep.complete,
     );
   }
 
@@ -126,6 +158,7 @@ class FirebaseAuthenticationRepository implements AuthenticationRepository {
   // ---------------------------------------------------------------------------
 
   /// A convenience stream exposing Firebase Auth state changes as [AppUser?].
+  @override
   Stream<AppUser?> authStateChanges() {
     return _auth.authStateChanges().asyncMap((User? firebaseUser) async {
       if (firebaseUser == null) {
@@ -147,8 +180,9 @@ class FirebaseAuthenticationRepository implements AuthenticationRepository {
   }
 
   Future<AppUser> _loadUserProfile(String uid) async {
-    final DocumentSnapshot<Map<String, dynamic>> snapshot =
-        await _firestore.doc('users/$uid').get();
+    final DocumentSnapshot<Map<String, dynamic>> snapshot = await _firestore
+        .doc('users/$uid')
+        .get();
 
     if (snapshot.exists) {
       final Map<String, dynamic> data = snapshot.data()!;
@@ -157,6 +191,7 @@ class FirebaseAuthenticationRepository implements AuthenticationRepository {
         username: (data['username'] as String?) ?? '',
         displayName: (data['displayName'] as String?) ?? '',
         onboardingComplete: (data['onboardingComplete'] as bool?) ?? false,
+        onboardingStep: _parseOnboardingStep(data),
       );
     }
 
@@ -168,4 +203,44 @@ class FirebaseAuthenticationRepository implements AuthenticationRepository {
       onboardingComplete: false,
     );
   }
+
+  UserOnboardingStep _parseOnboardingStep(Map<String, dynamic> data) {
+    if ((data['onboardingComplete'] as bool?) ?? false) {
+      return UserOnboardingStep.complete;
+    }
+    final String? value = data['onboardingStep'] as String?;
+    return UserOnboardingStep.values
+            .where((step) => step.name == value)
+            .firstOrNull ??
+        ((data['username'] as String?)?.isNotEmpty ?? false
+            ? UserOnboardingStep.permissions
+            : UserOnboardingStep.profile);
+  }
+
+  AuthenticationException _mapFirebaseAuthException(
+    FirebaseAuthException error,
+  ) {
+    final AuthenticationFailure failure = switch (error.code) {
+      'network-request-failed' => AuthenticationFailure.network,
+      'user-disabled' => AuthenticationFailure.disabled,
+      'operation-not-allowed' ||
+      'invalid-credential' ||
+      'invalid-oauth-client-id' => AuthenticationFailure.providerConfiguration,
+      _ => AuthenticationFailure.unknown,
+    };
+    return AuthenticationException(failure);
+  }
+}
+
+enum AuthenticationFailure {
+  cancelled,
+  network,
+  disabled,
+  providerConfiguration,
+  unknown,
+}
+
+class AuthenticationException implements Exception {
+  const AuthenticationException(this.failure);
+  final AuthenticationFailure failure;
 }

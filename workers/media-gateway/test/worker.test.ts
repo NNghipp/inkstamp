@@ -1,217 +1,140 @@
 import { describe, expect, it } from "vitest";
+import { InvalidAppCheckError } from "../src/data/firebase_app_check_verifier";
 import { InvalidAuthenticationError } from "../src/data/firebase_id_token_verifier";
-import {
-  handleRequest,
-  type MediaGatewayEnvironment,
-  type TokenVerifier,
-} from "../src/presentation/worker";
+import { InMemoryRateLimiter } from "../src/data/rate_limiter";
+import { handleRequest, type MediaGatewayEnvironment, type WorkerDependencies } from "../src/presentation/worker";
 
 const environment: MediaGatewayEnvironment = {
-  FIREBASE_PROJECT_ID: "inkstamp-dev",
-  CLOUDINARY_API_KEY: "public-key",
-  CLOUDINARY_API_SECRET: "private-secret",
-  CLOUDINARY_CLOUD_NAME: "inkstamp",
+  FIREBASE_PROJECT_ID: "inkstamp-dev", CLOUDINARY_API_KEY: "public-key",
+  CLOUDINARY_API_SECRET: "private-secret", CLOUDINARY_CLOUD_NAME: "inkstamp",
   CLOUDINARY_UPLOAD_PRESET: "inkstamp_private_images",
 };
 
-const authenticatedVerifier: TokenVerifier = {
-  async verify() {
-    return "user-1";
-  },
-};
+function dependencies(overrides: Partial<WorkerDependencies> = {}): WorkerDependencies {
+  return {
+    tokenVerifier: { async verify() { return "user-1"; } },
+    appCheckVerifier: { async verify({ appCheckHeader }) {
+      if (!appCheckHeader) throw new InvalidAppCheckError("App Check token is missing.");
+    } },
+    rateLimiter: { async checkLimit() { return { allowed: true, retryAfterSeconds: 0 }; } },
+    mediaAuthorizer: { async canRead() { return true; } },
+    assetDeleter: { async delete() {} },
+    ...overrides,
+  };
+}
 
 describe("media gateway", () => {
-  it("reports health", async () => {
-    const response = await handleRequest(
-      new Request("https://media.inkstamp.app/health"),
-      environment,
-      authenticatedVerifier,
-    );
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
-      status: "ok",
-      service: "inkstamp-media-gateway",
-    });
+  it("reports health only when configuration is complete", async () => {
+    expect((await handleRequest(new Request("https://host/health"), environment, dependencies())).status).toBe(200);
+    const invalid = await handleRequest(new Request("https://host/health"), { ...environment, CLOUDINARY_API_SECRET: "" }, dependencies());
+    expect(invalid.status).toBe(503);
+    expect(await invalid.text()).not.toContain("private-secret");
   });
 
-  it("returns a user-scoped authenticated upload signature", async () => {
-    const response = await handleRequest(
-      request({ mediaKind: "thumbnail" }),
-      environment,
-      authenticatedVerifier,
-    );
+  it("returns a user-scoped authenticated upload signature without its secret", async () => {
+    const response = await handleRequest(uploadRequest(), environment, dependencies());
     const body = await response.json<Record<string, unknown>>();
-
     expect(response.status).toBe(200);
-    expect(body.uploadUrl).toBe(
-      "https://api.cloudinary.com/v1_1/inkstamp/image/authenticated",
-    );
+    expect(body.uploadUrl).toBe("https://api.cloudinary.com/v1_1/inkstamp/image/authenticated");
     expect(JSON.stringify(body)).not.toContain("private-secret");
   });
 
-  it("rejects invalid media kinds", async () => {
-    const response = await handleRequest(
-      request({ mediaKind: "video" }),
-      environment,
-      authenticatedVerifier,
-    );
-
-    expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual({
-      error: "mediaKind must be stamp or thumbnail.",
-    });
+  it("rejects invalid media kinds and oversized bodies", async () => {
+    expect((await handleRequest(uploadRequest("video"), environment, dependencies())).status).toBe(400);
+    expect((await handleRequest(uploadRequest("stamp", "x".repeat(1100)), environment, dependencies())).status).toBe(400);
   });
 
-  it("rejects bodies larger than the endpoint contract", async () => {
-    const response = await handleRequest(
-      request({ mediaKind: "stamp", padding: "x".repeat(1100) }),
-      environment,
-      authenticatedVerifier,
-    );
-
-    expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual({
-      error: "Request body is too large.",
-    });
-  });
-
-  it("rejects unauthenticated requests", async () => {
-    const verifier: TokenVerifier = {
-      async verify() {
-        throw new InvalidAuthenticationError();
-      },
-    };
-    const response = await handleRequest(
-      request({ mediaKind: "stamp" }),
-      environment,
-      verifier,
-    );
-
+  it("rejects auth before consuming quota", async () => {
+    let calls = 0;
+    const response = await handleRequest(uploadRequest(), environment, dependencies({
+      tokenVerifier: { async verify() { throw new InvalidAuthenticationError(); } },
+      rateLimiter: { async checkLimit() { calls += 1; return { allowed: true, retryAfterSeconds: 0 }; } },
+    }));
     expect(response.status).toBe(401);
+    expect(calls).toBe(0);
   });
 
-  it("does not expose the endpoint through other routes", async () => {
-    const response = await handleRequest(
-      new Request("https://media.inkstamp.app/unknown"),
-      environment,
-      authenticatedVerifier,
+  it("requires App Check when enforced", async () => {
+    const response = await handleRequest(uploadRequest(), { ...environment, APP_CHECK_ENFORCED: "true" }, dependencies());
+    expect(response.status).toBe(403);
+  });
+
+  it("returns Retry-After when rate limited", async () => {
+    const response = await handleRequest(uploadRequest(), { ...environment, RATE_LIMIT_ENFORCED: "true" }, dependencies({
+      rateLimiter: { async checkLimit() { return { allowed: false, retryAfterSeconds: 37 }; } },
+    }));
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Retry-After")).toBe("37");
+  });
+
+  it("uses separate endpoint scopes", async () => {
+    const scopes: string[] = [];
+    const deps = dependencies({ rateLimiter: { async checkLimit(input) {
+      scopes.push(input.scope); return { allowed: true, retryAfterSeconds: 0 };
+    } } });
+    const env = { ...environment, RATE_LIMIT_ENFORCED: "true" };
+    await handleRequest(uploadRequest(), env, deps);
+    await handleRequest(deliveryRequest(), env, deps);
+    expect(scopes).toEqual(["upload", "delivery"]);
+  });
+
+  it("signs delivery URLs only after authorization", async () => {
+    expect((await handleRequest(deliveryRequest(), environment, dependencies())).status).toBe(200);
+    expect((await handleRequest(deliveryRequest(), environment, dependencies({ mediaAuthorizer: {
+      async canRead() { return false; },
+    } }))).status).toBe(403);
+  });
+
+  it("rejects malformed public IDs and unknown routes", async () => {
+    expect((await handleRequest(deliveryRequest(["other/stamp/id"]), environment, dependencies())).status).toBe(400);
+    expect((await handleRequest(new Request("https://host/unknown"), environment, dependencies())).status).toBe(404);
+  });
+
+  it("deletes only media owned by the authenticated user", async () => {
+    const deleted: string[] = [];
+    const deps = dependencies({
+      assetDeleter: { async delete(input) { deleted.push(input.publicId); } },
+    });
+    const owned = await handleRequest(
+      deleteRequest("inkstamp/user-1/stamp/id-1"), environment, deps,
     );
-
-    expect(response.status).toBe(404);
-  });
-
-  describe("App Check verification", () => {
-    it("allows request when App Check is not enforced", async () => {
-      const response = await handleRequest(
-        request({ mediaKind: "stamp" }),
-        { ...environment, APP_CHECK_ENFORCED: "false" },
-        authenticatedVerifier,
-      );
-      expect(response.status).toBe(200);
-    });
-
-    it("rejects request when App Check is enforced and header is missing", async () => {
-      const response = await handleRequest(
-        request({ mediaKind: "stamp" }),
-        { ...environment, APP_CHECK_ENFORCED: "true" },
-        authenticatedVerifier,
-      );
-      expect(response.status).toBe(403);
-      await expect(response.json()).resolves.toEqual({
-        error: "App Check token is missing.",
-      });
-    });
-  });
-
-  describe("Rate Limiting", () => {
-    it("returns 429 when rate limit is exceeded and enforced", async () => {
-      const rateLimitEnv = { ...environment, RATE_LIMIT_ENFORCED: "true" };
-      // InMemoryRateLimiter limits to 50 requests per User per minute.
-      // Let's send 50 requests (which should succeed).
-      for (let i = 0; i < 50; i++) {
-        const res = await handleRequest(
-          request({ mediaKind: "stamp" }),
-          rateLimitEnv,
-          authenticatedVerifier,
-        );
-        expect(res.status).toBe(200);
-      }
-      // The 51st request should be rate limited
-      const rateLimitedRes = await handleRequest(
-        request({ mediaKind: "stamp" }),
-        rateLimitEnv,
-        authenticatedVerifier,
-      );
-      expect(rateLimitedRes.status).toBe(429);
-      await expect(rateLimitedRes.json()).resolves.toEqual({
-        error: "Too many requests. Please try again later.",
-      });
-    });
-  });
-
-  describe("Delivery URLs", () => {
-    it("returns signed delivery URLs for valid public IDs", async () => {
-      const req = new Request(
-        "https://media.inkstamp.app/v1/media/delivery-urls",
-        {
-          method: "POST",
-          headers: {
-            Authorization: "Bearer test-token",
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            publicIds: [
-              "inkstamp/user-1/stamp/uuid-1",
-              "inkstamp/user-1/thumbnail/uuid-1",
-            ],
-          }),
-        },
-      );
-      const response = await handleRequest(req, environment, authenticatedVerifier);
-      expect(response.status).toBe(200);
-      const body = await response.json<any>();
-      expect(body.deliveryUrls).toBeDefined();
-      expect(body.deliveryUrls["inkstamp/user-1/stamp/uuid-1"]).toContain(
-        "https://res.cloudinary.com/inkstamp/image/authenticated/s--",
-      );
-      expect(body.deliveryUrls["inkstamp/user-1/stamp/uuid-1"]).toContain(
-        "/inkstamp/user-1/stamp/uuid-1",
-      );
-    });
-
-    it("rejects invalid public ID namespace", async () => {
-      const req = new Request(
-        "https://media.inkstamp.app/v1/media/delivery-urls",
-        {
-          method: "POST",
-          headers: {
-            Authorization: "Bearer test-token",
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            publicIds: ["other_folder/stamp/uuid-1"],
-          }),
-        },
-      );
-      const response = await handleRequest(req, environment, authenticatedVerifier);
-      expect(response.status).toBe(400);
-      await expect(response.json()).resolves.toEqual({
-        error: "Forbidden publicId namespace.",
-      });
-    });
+    const foreign = await handleRequest(
+      deleteRequest("inkstamp/user-2/stamp/id-1"), environment, deps,
+    );
+    expect(owned.status).toBe(200);
+    expect(foreign.status).toBe(403);
+    expect(deleted).toEqual(["inkstamp/user-1/stamp/id-1"]);
   });
 });
 
-function request(body: Record<string, string>): Request {
-  return new Request(
-    "https://media.inkstamp.app/v1/media/upload-signatures",
-    {
-      method: "POST",
-      headers: {
-        Authorization: "Bearer test-token",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    },
-  );
+describe("InMemoryRateLimiter", () => {
+  it("isolates users/scopes and resets windows", async () => {
+    let now = 1_000;
+    const limiter = new InMemoryRateLimiter(() => now, { upload: 1, delivery: 1 }, 10, 1_000);
+    const check = (userId: string, scope: "upload" | "delivery") => limiter.checkLimit({ ip: "ip", userId, scope });
+    expect((await check("a", "upload")).allowed).toBe(true);
+    expect((await check("a", "upload")).allowed).toBe(false);
+    expect((await check("a", "delivery")).allowed).toBe(true);
+    expect((await check("b", "upload")).allowed).toBe(true);
+    now = 2_001;
+    expect((await check("a", "upload")).allowed).toBe(true);
+  });
+});
+
+function uploadRequest(mediaKind = "stamp", padding = ""): Request {
+  return new Request("https://host/v1/media/upload-signatures", { method: "POST",
+    headers: { Authorization: "Bearer token", "Content-Type": "application/json" },
+    body: JSON.stringify({ mediaKind, padding }) });
+}
+
+function deliveryRequest(publicIds = ["inkstamp/user-1/stamp/id-1"]): Request {
+  return new Request("https://host/v1/media/delivery-urls", { method: "POST",
+    headers: { Authorization: "Bearer token", "Content-Type": "application/json" },
+    body: JSON.stringify({ publicIds }) });
+}
+
+function deleteRequest(publicId: string): Request {
+  return new Request("https://host/v1/media/delete", { method: "POST",
+    headers: { Authorization: "Bearer token", "Content-Type": "application/json" },
+    body: JSON.stringify({ publicId }) });
 }
