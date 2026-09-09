@@ -116,6 +116,7 @@ class _InboxStampCard extends StatelessWidget {
                 seed: stamp.seed,
                 frameStyle: stamp.frameStyle,
                 paperTone: stamp.paperTone,
+                publicId: stamp.cloudinaryThumbnailPublicId,
                 heroTag: 'stamp-${stamp.id}',
                 showShadow: false,
               ),

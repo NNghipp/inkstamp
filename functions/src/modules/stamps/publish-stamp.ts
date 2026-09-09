@@ -3,12 +3,11 @@ import { FieldValue } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import {
   maxDailyStamps,
-  maxStampBytes,
   region,
 } from "../../config/runtime.js";
 import { requireAuth } from "../../shared/auth/require-auth.js";
 import { toHttpsError } from "../../shared/errors/to-https-error.js";
-import { firestore, storage } from "../../shared/firebase/admin.js";
+import { firestore } from "../../shared/firebase/admin.js";
 import { consumeDailyQuota } from "../../shared/rate-limit/rate-limit.js";
 import { publishStampSchema } from "../../shared/validation/schemas.js";
 import { sendStampNotifications } from "../notifications/send-notifications.js";
@@ -59,26 +58,16 @@ export const publishStamp = onCall(
         replyToStampId: input.replyToStampId,
       });
 
-      const bucket = storage.bucket();
-      const draftImagePath = `drafts/${senderId}/${input.draftId}/stamp.jpg`;
-      const draftThumbnailPath =
-        `drafts/${senderId}/${input.draftId}/thumbnail.jpg`;
-      const draftImage = bucket.file(draftImagePath);
-      const draftThumbnail = bucket.file(draftThumbnailPath);
-      const [[imageExists], [thumbnailExists]] = await Promise.all([
-        draftImage.exists(),
-        draftThumbnail.exists(),
-      ]);
-      if (!imageExists || !thumbnailExists) {
-        throw new HttpsError("not-found", "Stamp draft media was not found.");
-      }
+      const expectedStampPrefix = `inkstamp/${senderId}/stamp/`;
+      const expectedThumbnailPrefix = `inkstamp/${senderId}/thumbnail/`;
 
-      const [metadata] = await draftImage.getMetadata();
-      const size = Number(metadata.size ?? 0);
-      if (metadata.contentType !== "image/jpeg" || size > maxStampBytes) {
+      if (
+        !input.cloudinaryPublicId.startsWith(expectedStampPrefix) ||
+        !input.cloudinaryThumbnailPublicId.startsWith(expectedThumbnailPrefix)
+      ) {
         throw new HttpsError(
           "invalid-argument",
-          "Stamp media must be a JPEG smaller than 5 MB.",
+          "The Cloudinary public IDs must belong to the sender and have the correct media type.",
         );
       }
 
@@ -87,9 +76,6 @@ export const publishStamp = onCall(
       const senderProfile = await firestore.doc(`users/${senderId}`).get();
       const senderName =
         (senderProfile.get("displayName") as string | undefined) ?? "Bạn bè";
-      const finalImagePath = `stamps/${senderId}/${stampId}/stamp.jpg`;
-      const finalThumbnailPath =
-        `stamps/${senderId}/${stampId}/thumbnail.jpg`;
 
       const created = await firestore.runTransaction(async (transaction) => {
         const requestSnapshot = await transaction.get(requestReference);
@@ -110,8 +96,8 @@ export const publishStamp = onCall(
           paperTone: input.paperTone,
           captureLocalDate: input.captureLocalDate,
           timezoneOffsetMinutes: input.timezoneOffsetMinutes,
-          imagePath: finalImagePath,
-          thumbnailPath: finalThumbnailPath,
+          cloudinaryPublicId: input.cloudinaryPublicId,
+          cloudinaryThumbnailPublicId: input.cloudinaryThumbnailPublicId,
           status: "publishing",
           createdAt: FieldValue.serverTimestamp(),
           updatedAt: FieldValue.serverTimestamp(),
@@ -137,11 +123,6 @@ export const publishStamp = onCall(
       }
 
       try {
-        await Promise.all([
-          draftImage.copy(bucket.file(finalImagePath)),
-          draftThumbnail.copy(bucket.file(finalThumbnailPath)),
-        ]);
-
         const batch = firestore.batch();
         for (const recipientId of recipientIds) {
           batch.create(
@@ -150,8 +131,8 @@ export const publishStamp = onCall(
               stampId,
               senderId,
               senderName,
-              imagePath: finalImagePath,
-              thumbnailPath: finalThumbnailPath,
+              cloudinaryPublicId: input.cloudinaryPublicId,
+              cloudinaryThumbnailPublicId: input.cloudinaryThumbnailPublicId,
               frameStyle: input.frameStyle,
               paperTone: input.paperTone,
               replyToStampId: input.replyToStampId ?? null,
@@ -167,16 +148,11 @@ export const publishStamp = onCall(
           updatedAt: FieldValue.serverTimestamp(),
         });
         await batch.commit();
-        await Promise.allSettled([
-          draftImage.delete({ ignoreNotFound: true }),
-          draftThumbnail.delete({ ignoreNotFound: true }),
-          sendStampNotifications(recipientIds, stampId, senderName),
-        ]);
+        await sendStampNotifications(recipientIds, stampId, senderName);
       } catch (error) {
         await Promise.allSettled([
           stampReference.delete(),
           requestReference.delete(),
-          bucket.deleteFiles({ prefix: `stamps/${senderId}/${stampId}/` }),
         ]);
         throw error;
       }

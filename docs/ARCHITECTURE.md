@@ -23,18 +23,25 @@ composition points without changing screens.
 ## Backend
 
 Callable functions are the only route for privileged social mutations. Direct
-client writes are limited to a user's own push-token documents and draft
-media. Firestore and Storage otherwise use default-deny rules.
+client writes are limited to a user's own push-token documents. Firestore is
+otherwise default-deny. During the closed beta, Functions run in the local
+Emulator Suite and are not deployed to the Spark Firebase project.
 
 `publishStamp` resolves and validates the audience on the server, records a
-request ID for idempotency, copies validated JPEG assets out of the draft
-namespace, writes one private delivery per recipient, and sends a metadata-only
-push notification.
+request ID for idempotency, records Cloudinary media identifiers after a
+trusted upload, writes one private delivery per recipient, and sends a
+metadata-only push notification.
 
-Recipients read delivery documents in their own user subtree. A Storage rule
-checks for that delivery before serving media. The sender reads the private
-stamp document. Recipient IDs therefore never need to be exposed to another
-recipient.
+Recipients read delivery documents in their own user subtree. Private media
+delivery must use short-lived Cloudinary signed URLs issued by a trusted
+backend; the Flutter client never receives a Cloudinary API secret. The sender
+reads the private stamp document. Recipient IDs therefore never need to be
+exposed to another recipient.
+
+`workers/media-gateway` is an isolated feasibility spike, not an approved
+production service. Deployment remains blocked until App Check verification,
+rate limiting, private delivery URL issuance and an owner-approved Cloudinary
+account are in place.
 
 ## Environments
 
@@ -46,4 +53,3 @@ Use separate Firebase projects:
 
 Production functions require App Check. Emulator development may use debug
 App Check tokens.
-

@@ -1,0 +1,21 @@
+{
+  "name": "inkstamp-media-gateway",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc --noEmit",
+    "check": "npm run types && npm run build && wrangler deploy --dry-run",
+    "test": "vitest run",
+    "types": "wrangler types"
+  },
+  "dependencies": {
+    "jose": "^6.2.10"
+  },
+  "devDependencies": {
+    "@types/node": "^26.3.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.11",
+    "wrangler": "^4.125.0"
+  }
+}

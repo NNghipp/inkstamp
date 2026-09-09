@@ -32,6 +32,8 @@ class Stamp {
     this.reaction,
     this.replyToStampId,
     this.isSeen = false,
+    this.cloudinaryPublicId,
+    this.cloudinaryThumbnailPublicId,
   });
 
   final String id;
@@ -45,11 +47,15 @@ class Stamp {
   final ReactionType? reaction;
   final String? replyToStampId;
   final bool isSeen;
+  final String? cloudinaryPublicId;
+  final String? cloudinaryThumbnailPublicId;
 
   Stamp copyWith({
     ReactionType? reaction,
     bool clearReaction = false,
     bool? isSeen,
+    String? cloudinaryPublicId,
+    String? cloudinaryThumbnailPublicId,
   }) {
     return Stamp(
       id: id,
@@ -63,6 +69,9 @@ class Stamp {
       reaction: clearReaction ? null : reaction ?? this.reaction,
       replyToStampId: replyToStampId,
       isSeen: isSeen ?? this.isSeen,
+      cloudinaryPublicId: cloudinaryPublicId ?? this.cloudinaryPublicId,
+      cloudinaryThumbnailPublicId:
+          cloudinaryThumbnailPublicId ?? this.cloudinaryThumbnailPublicId,
     );
   }
 }

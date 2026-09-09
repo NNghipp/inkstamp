@@ -90,6 +90,8 @@ class InMemoryStampRepository implements StampRepository {
       paperTone: draft.paperTone,
       isSentByMe: true,
       replyToStampId: draft.replyToStampId,
+      cloudinaryPublicId: draft.cloudinaryPublicId,
+      cloudinaryThumbnailPublicId: draft.cloudinaryThumbnailPublicId,
     );
     _sent.insert(0, stamp);
     return stamp;

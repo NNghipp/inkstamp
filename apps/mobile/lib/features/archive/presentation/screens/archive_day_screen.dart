@@ -49,6 +49,7 @@ class ArchiveDayScreen extends ConsumerWidget {
                     seed: stamp.seed,
                     frameStyle: stamp.frameStyle,
                     paperTone: stamp.paperTone,
+                    publicId: stamp.cloudinaryThumbnailPublicId,
                   ),
                 );
               },

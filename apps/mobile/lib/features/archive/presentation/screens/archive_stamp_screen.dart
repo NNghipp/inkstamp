@@ -33,6 +33,7 @@ class ArchiveStampScreen extends ConsumerWidget {
                     seed: stamp.seed,
                     frameStyle: stamp.frameStyle,
                     paperTone: stamp.paperTone,
+                    publicId: stamp.cloudinaryPublicId,
                   ),
                 ),
                 const SizedBox(height: AppSpacing.xl),

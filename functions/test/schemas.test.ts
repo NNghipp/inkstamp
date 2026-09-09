@@ -26,7 +26,8 @@ describe("reserveUsernameSchema", () => {
 describe("publishStampSchema", () => {
   const validPayload = {
     requestId: "a0f6bd84-a83b-4e1f-9aac-2e6b8f53ff00",
-    draftId: "draft-1",
+    cloudinaryPublicId: "inkstamp/sender-1/stamp/uuid-1",
+    cloudinaryThumbnailPublicId: "inkstamp/sender-1/thumbnail/uuid-1",
     audience: "allFriends",
     selectedRecipientIds: [],
     frameStyle: "classic",

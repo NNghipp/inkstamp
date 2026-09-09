@@ -1,0 +1,5 @@
+# Copy to .dev.vars for local Worker development. Never commit real values.
+CLOUDINARY_CLOUD_NAME=
+CLOUDINARY_API_KEY=
+CLOUDINARY_API_SECRET=
+CLOUDINARY_UPLOAD_PRESET=

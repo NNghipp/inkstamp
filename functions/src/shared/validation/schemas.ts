@@ -11,6 +11,10 @@ export const reserveUsernameSchema = z.object({
   displayName: z.string().trim().min(1).max(30),
 });
 
+export const onboardingStepSchema = z.object({
+  step: z.enum(["widgetIntro", "complete"]),
+});
+
 export const usernameLookupSchema = z.object({
   username: usernameSchema,
 });
@@ -48,7 +52,8 @@ export const paperToneSchema = z.enum([
 export const publishStampSchema = z
   .object({
     requestId: z.uuid(),
-    draftId: z.string().trim().min(1).max(128),
+    cloudinaryPublicId: z.string().trim().min(1).max(256),
+    cloudinaryThumbnailPublicId: z.string().trim().min(1).max(256),
     audience: audienceModeSchema,
     selectedRecipientIds: z
       .array(z.string().trim().min(1).max(128))

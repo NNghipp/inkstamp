@@ -38,7 +38,7 @@ social feed.
 
 ## Current milestone
 
-**Week 1 is complete.**
+**Week 2-3 stabilization is implemented locally; Android device verification is pending.**
 
 The repository currently provides:
 
@@ -98,7 +98,8 @@ Read the full design in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 - Flutter and Dart
 - Riverpod
 - GoRouter
-- Firebase Authentication, Firestore, Storage, Functions and Messaging
+- Firebase Authentication, Firestore, Functions, Messaging and App Check
+- Cloudinary authenticated media storage through a local Cloudflare Worker
 - TypeScript and Zod
 - Native WidgetKit on iOS
 - Native AppWidgetProvider on Android
@@ -113,7 +114,16 @@ flutter pub get
 flutter run
 ```
 
-The current app starts in demo mode and does not require Firebase credentials.
+Without generated Firebase config the app starts in explicit demo mode. With
+Firebase configured it uses Firebase repositories and does not silently fall
+back to demo after an authentication or network error.
+
+For Android connected to the local media gateway:
+
+```bash
+adb reverse tcp:8787 tcp:8787
+flutter run --dart-define=MEDIA_GATEWAY_BASE_URL=http://127.0.0.1:8787
+```
 
 ### Backend
 
@@ -134,6 +144,7 @@ Detailed platform and Firebase setup instructions are available in
 dart format --output=none --set-exit-if-changed lib test
 flutter analyze
 flutter test
+flutter build apk --debug
 
 cd functions
 npm run lint
@@ -141,7 +152,8 @@ npm test
 npm run build
 ```
 
-At the Week 1 checkpoint:
+See [WEEK_2_REVIEW.md](WEEK_2_REVIEW.md) and [testcase.md](testcase.md) for the
+current results and remaining device/configuration blockers.
 
 - Flutter analyzer: no issues.
 - Flutter tests: 12 passing.
@@ -177,4 +189,3 @@ a production Firebase or Apple/Google developer account.
 
 This is a personal, proprietary project. All rights are reserved. See
 [LICENSE](LICENSE).
-
