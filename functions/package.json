@@ -34,7 +34,10 @@
     "vitest": "^4.1.11"
   },
   "overrides": {
-    "uuid": "11.1.1"
+    "uuid": "11.1.1",
+    "@firebase/firestore": {
+      "@grpc/grpc-js": "1.14.6"
+    }
   },
   "optionalDependencies": {
     "@rolldown/binding-linux-x64-gnu": "1.2.5"
