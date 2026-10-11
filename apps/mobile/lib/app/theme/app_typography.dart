@@ -1,42 +1,39 @@
 import 'package:flutter/material.dart';
 
 abstract final class AppTypography {
-  static const String fontFamily = 'sans-serif';
+  static const String fontFamily = 'BeVietnamPro';
 
   static const TextStyle display = TextStyle(
-    color: Color(0xFF22211F),
     fontSize: 40,
-    fontWeight: FontWeight.w700,
-    height: 1.05,
-    letterSpacing: -1.4,
+    fontWeight: FontWeight.w500,
+    height: 1.2,
+    letterSpacing: -0.8,
   );
 
   static const TextStyle title = TextStyle(
-    color: Color(0xFF22211F),
-    fontSize: 28,
-    fontWeight: FontWeight.w700,
-    height: 1.1,
-    letterSpacing: -0.6,
+    fontSize: 30,
+    fontWeight: FontWeight.w500,
+    height: 1.27,
+    letterSpacing: -0.45,
   );
 
   static const TextStyle heading = TextStyle(
-    color: Color(0xFF22211F),
     fontSize: 20,
-    fontWeight: FontWeight.w700,
-    height: 1.2,
+    fontWeight: FontWeight.w600,
+    height: 1.3,
+    letterSpacing: -0.1,
   );
 
   static const TextStyle body = TextStyle(
-    color: Color(0xFF353431),
     fontSize: 16,
     fontWeight: FontWeight.w400,
-    height: 1.45,
+    height: 1.55,
   );
 
   static const TextStyle label = TextStyle(
-    color: Color(0xFF353431),
-    fontSize: 13,
-    fontWeight: FontWeight.w600,
-    letterSpacing: 0.1,
+    fontSize: 12,
+    fontWeight: FontWeight.w500,
+    height: 1.3,
+    letterSpacing: 0.48,
   );
 }

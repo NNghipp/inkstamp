@@ -1,9 +1,9 @@
 import 'dart:async';
 
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:inkstamp/features/authentication/data/repositories/firebase_authentication_repository.dart';
 import 'package:inkstamp/features/authentication/data/repositories/in_memory_authentication_repository.dart';
+import 'package:inkstamp/features/authentication/domain/dev_auth_policy.dart';
 import 'package:inkstamp/features/authentication/domain/entities/app_user.dart';
 import 'package:inkstamp/features/authentication/domain/repositories/authentication_repository.dart';
 import 'package:inkstamp/features/authentication/domain/use_cases/sign_in.dart';
@@ -80,7 +80,8 @@ sessionControllerProvider = NotifierProvider<SessionController, SessionState>(
 // ---------------------------------------------------------------------------
 
 class SessionController extends Notifier<SessionState> {
-  StreamSubscription<User?>? _authSubscription;
+  StreamSubscription<AppUser?>? _authSubscription;
+  int _operation = 0;
 
   AuthenticationRepository get _repository {
     return ref.read(authenticationRepositoryProvider);
@@ -96,37 +97,23 @@ class SessionController extends Notifier<SessionState> {
   // ---- Auth state listener -------------------------------------------------
 
   void _listenToAuthChanges() {
-    final bool isFirebaseReady = ref.read(firebaseInitializedProvider);
-    if (!isFirebaseReady) {
-      return;
-    }
-
     _authSubscription?.cancel();
-    _authSubscription = FirebaseAuth.instance.authStateChanges().listen((
-      User? firebaseUser,
-    ) {
-      if (firebaseUser == null) {
-        // User signed out externally (e.g. revoked session).
-        state = const SessionState.signedOut();
-      } else if (state.stage == SessionStage.signedOut && !state.isLoading) {
-        // An existing Firebase session was found on app launch – restore it.
-        _restoreSession(firebaseUser.uid);
-      }
-    });
-  }
-
-  Future<void> _restoreSession(String uid) async {
-    state = state.copyWith(isLoading: true);
-    try {
-      final AppUser? user = await _repository.authStateChanges().first;
-      if (user != null) {
-        state = SessionState(stage: _stageForUser(user), user: user);
-        return;
-      }
-      state = const SessionState.signedOut();
-    } on Object {
-      state = const SessionState.signedOut();
-    }
+    _authSubscription = _repository.authStateChanges().listen(
+      (user) {
+        if (!ref.mounted || state.isLoading) return;
+        if (user == null) {
+          _operation++;
+          state = const SessionState.signedOut();
+        } else {
+          state = SessionState(stage: _stageForUser(user), user: user);
+        }
+      },
+      onError: (Object _) {
+        if (ref.mounted && !state.isLoading) {
+          state = const SessionState.signedOut();
+        }
+      },
+    );
   }
 
   SessionStage _stageForUser(AppUser user) {
@@ -141,11 +128,14 @@ class SessionController extends Notifier<SessionState> {
   // ---- Public API ----------------------------------------------------------
 
   Future<void> signIn(SignInProvider provider) async {
+    final operation = ++_operation;
     state = state.copyWith(isLoading: true, clearError: true);
     try {
       final AppUser user = await SignIn(_repository)(provider);
+      if (!ref.mounted || operation != _operation) return;
       state = SessionState(stage: _stageForUser(user), user: user);
     } on AuthenticationException catch (error) {
+      if (!ref.mounted || operation != _operation) return;
       state = state.copyWith(
         isLoading: false,
         errorMessage: switch (error.failure) {
@@ -160,9 +150,35 @@ class SessionController extends Notifier<SessionState> {
         },
       );
     } on Object {
+      if (!ref.mounted || operation != _operation) return;
       state = state.copyWith(
         isLoading: false,
         errorMessage: 'Unable to sign in. Please try again.',
+      );
+    }
+  }
+
+  Future<void> signInForDevelopment(
+    DevTestAccount account, {
+    required String password,
+  }) async {
+    if (!DevAuthPolicy.compiledEnabled || state.isLoading) {
+      throw StateError('DEV test authentication is unavailable.');
+    }
+    final operation = ++_operation;
+    state = const SessionState(stage: SessionStage.signedOut, isLoading: true);
+    try {
+      final user = await _repository.signInForDevelopment(
+        email: account.email,
+        password: password,
+      );
+      if (!ref.mounted || operation != _operation) return;
+      state = SessionState(stage: _stageForUser(user), user: user);
+    } on Object {
+      if (!ref.mounted || operation != _operation) return;
+      state = const SessionState(
+        stage: SessionStage.signedOut,
+        errorMessage: 'DEV sign-in failed. Check local setup and credentials.',
       );
     }
   }
@@ -256,8 +272,13 @@ class SessionController extends Notifier<SessionState> {
   }
 
   Future<void> signOut() async {
-    await _repository.signOut();
+    final operation = ++_operation;
+    // Clear all user-scoped consumers before asynchronous provider sign-out.
     state = const SessionState.signedOut();
+    await _repository.signOut();
+    if (ref.mounted && operation == _operation) {
+      state = const SessionState.signedOut();
+    }
   }
 
   Future<void> deleteAccount() async {

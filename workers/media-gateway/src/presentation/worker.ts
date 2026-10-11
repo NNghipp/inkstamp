@@ -36,6 +36,8 @@ export interface CloudinarySecrets {
 export type MediaGatewayEnvironment = Env & CloudinarySecrets & {
   readonly APP_CHECK_ENFORCED?: string;
   readonly RATE_LIMIT_ENFORCED?: string;
+  readonly APP_ENV?: string;
+  readonly FIREBASE_PROJECT_NUMBER?: string;
 };
 
 export interface TokenVerifier {
@@ -48,7 +50,7 @@ export interface TokenVerifier {
 export interface AppCheckVerifier {
   verify(input: {
     appCheckHeader: string | null;
-    projectId: string;
+    projectNumber: string;
   }): Promise<void>;
 }
 
@@ -103,7 +105,7 @@ export async function handleRequest(
     if (environment.APP_CHECK_ENFORCED === "true") {
       await dependencies.appCheckVerifier.verify({
         appCheckHeader: request.headers.get("X-Firebase-App-Check"),
-        projectId: environment.FIREBASE_PROJECT_ID,
+        projectNumber: environment.FIREBASE_PROJECT_NUMBER ?? "",
       });
     }
 
@@ -132,12 +134,12 @@ export async function handleRequest(
     }
 
     if (isUpload) {
-      const mediaKind = await parseMediaKind(request);
+      const { mediaKind, imageFormat } = await parseMediaKind(request);
       const signature = await new CreateUploadSignature(
         cloudinaryConfiguration(environment),
         () => Math.floor(Date.now() / 1000),
         () => crypto.randomUUID(),
-      ).execute({ userId, mediaKind });
+      ).execute({ userId, mediaKind, imageFormat });
       return json(signature, 200);
     }
 
@@ -179,7 +181,7 @@ export async function handleRequest(
       return json({ error: "Authentication is required." }, 401);
     }
     if (error instanceof InvalidAppCheckError) {
-      return json({ error: error.message }, 403);
+      return json({ error: "App verification is required." }, 403);
     }
     if (error instanceof InvalidRequestError || error instanceof InvalidConfigurationError) {
       return json({ error: error.message }, error instanceof InvalidConfigurationError ? 503 : 400);
@@ -187,7 +189,7 @@ export async function handleRequest(
     console.error(JSON.stringify({
       message: "media gateway request failed",
       path: url.pathname,
-      error: error instanceof Error ? error.name : "UnknownError",
+      error: "UnexpectedError",
     }));
     return json({ error: "Unable to process the request." }, 500);
   }
@@ -202,6 +204,14 @@ export default createWorker({
 });
 
 function validateEnvironment(environment: MediaGatewayEnvironment): void {
+  if (environment.APP_ENV === "prod" || environment.APP_ENV === "staging") {
+    if (environment.FIREBASE_PROJECT_ID === "inkstamp-dev" ||
+        environment.APP_CHECK_ENFORCED !== "true" ||
+        environment.RATE_LIMIT_ENFORCED !== "true" ||
+        !/^\d+$/.test(environment.FIREBASE_PROJECT_NUMBER ?? "")) {
+      throw new InvalidConfigurationError("Isolated secure environment configuration required.");
+    }
+  }
   const names: ReadonlyArray<keyof CloudinarySecrets | "FIREBASE_PROJECT_ID"> = [
     "FIREBASE_PROJECT_ID",
     "CLOUDINARY_CLOUD_NAME",
@@ -226,13 +236,19 @@ function cloudinaryConfiguration(environment: CloudinarySecrets): CloudinaryConf
   };
 }
 
-async function parseMediaKind(request: Request): Promise<MediaKind> {
+async function parseMediaKind(request: Request): Promise<{
+  mediaKind: MediaKind; imageFormat?: "stamp_png_v1";
+}> {
   const body = await readJsonRequest(request, 1024);
   if (typeof body !== "object" || body === null || !("mediaKind" in body) ||
       (body.mediaKind !== "stamp" && body.mediaKind !== "thumbnail")) {
     throw new InvalidRequestError("mediaKind must be stamp or thumbnail.");
   }
-  return body.mediaKind;
+  if ("imageFormat" in body && body.imageFormat !== "stamp_png_v1") {
+    throw new InvalidRequestError("Unsupported image format.");
+  }
+  return { mediaKind: body.mediaKind,
+    ...("imageFormat" in body ? { imageFormat: "stamp_png_v1" as const } : {}) };
 }
 
 async function parsePublicIds(request: Request): Promise<string[]> {

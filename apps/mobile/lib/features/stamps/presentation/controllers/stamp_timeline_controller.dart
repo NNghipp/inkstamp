@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:inkstamp/features/authentication/presentation/controllers/session_controller.dart';
+import 'package:inkstamp/features/friends/domain/entities/friend.dart';
 import 'package:inkstamp/features/friends/presentation/controllers/friends_controller.dart';
 import 'package:inkstamp/features/stamps/data/repositories/cloudinary_upload_repository.dart';
 import 'package:inkstamp/features/stamps/data/repositories/firebase_stamp_repository.dart';
@@ -8,6 +9,7 @@ import 'package:inkstamp/features/stamps/domain/entities/stamp.dart';
 import 'package:inkstamp/features/stamps/domain/entities/stamp_draft.dart';
 import 'package:inkstamp/features/stamps/domain/repositories/media_upload_repository.dart';
 import 'package:inkstamp/features/stamps/domain/repositories/stamp_repository.dart';
+import 'package:inkstamp/features/stamps/presentation/controllers/stamp_publication_controller.dart';
 
 class StampTimelineState {
   const StampTimelineState({
@@ -56,20 +58,52 @@ stampTimelineControllerProvider =
     );
 
 class StampTimelineController extends Notifier<StampTimelineState> {
+  final Map<int, _PublishAttempt> _attempts = <int, _PublishAttempt>{};
+  int _generation = 0;
   StampRepository get _repository => ref.read(stampRepositoryProvider);
 
   @override
   StampTimelineState build() {
+    ref.watch(sessionControllerProvider.select((value) => value.user?.id));
+    _generation++;
+    _attempts.clear();
     Future<void>.microtask(load);
     return const StampTimelineState(isLoading: true);
   }
 
   Future<void> load() async {
-    final (List<Stamp> received, List<Stamp> sent) = await (
-      _repository.getReceived(),
-      _repository.getSent(),
-    ).wait;
-    state = state.copyWith(received: received, sent: sent, isLoading: false);
+    state = state.copyWith(isLoading: true, clearError: true);
+    final generation = _generation;
+    final repository = _repository;
+    final initialSentIds = state.sent.map((stamp) => stamp.id).toSet();
+    try {
+      final (List<Stamp> received, List<Stamp> sent) = await (
+        repository.getReceived(),
+        repository.getSent(),
+      ).wait;
+      if (!ref.mounted || generation != _generation) return;
+      // A refresh must not overwrite a publish that completed while loading.
+      final merged = <String, Stamp>{
+        for (final stamp in sent) stamp.id: stamp,
+        for (final stamp in state.sent.where(
+          (stamp) => !initialSentIds.contains(stamp.id),
+        ))
+          stamp.id: stamp,
+      }.values.toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      state = state.copyWith(
+        received: received,
+        sent: merged,
+        isLoading: false,
+        clearError: true,
+      );
+    } on Object {
+      if (ref.mounted && generation == _generation) {
+        state = state.copyWith(
+          isLoading: false,
+          errorMessage: 'Không thể tải ký ức. Thử lại sau.',
+        );
+      }
+    }
   }
 
   Stamp? findById(String stampId) {
@@ -104,18 +138,36 @@ class StampTimelineController extends Notifier<StampTimelineState> {
   }
 
   Future<Stamp?> publish(StampDraft draft) async {
+    final generation = _generation;
+    final repository = _repository;
+    if (state.isPublishing) return null;
+    final existing = _attempts[draft.seed];
+    if (existing?.stamp != null) return existing!.stamp;
+    if (ref.read(firebaseInitializedProvider) &&
+        (draft.localImagePath == null || draft.localThumbnailPath == null)) {
+      state = state.copyWith(
+        errorMessage: 'Retake this photo before sending it.',
+      );
+      return null;
+    }
     final FriendsState friendsState = ref.read(friendsControllerProvider);
-    final List<String> recipientIds = switch (draft.audience) {
-      AudienceMode.allFriends =>
-        friendsState.friends.map((friend) => friend.id).toList(growable: false),
-      AudienceMode.closeFriends =>
-        friendsState.closeFriends
-            .map((friend) => friend.id)
-            .toList(growable: false),
-      AudienceMode.selected => draft.selectedRecipientIds.toList(
-        growable: false,
-      ),
-    };
+    final eligible = friendsState.friends
+        .where((friend) => friend.status == FriendStatus.accepted)
+        .map((friend) => friend.id)
+        .toSet();
+    final List<String> recipientIds = existing?.committed == true
+        ? existing!.recipients
+        : switch (draft.audience) {
+            AudienceMode.allFriends => eligible.toList(growable: false),
+            AudienceMode.closeFriends =>
+              friendsState.closeFriends
+                  .map((friend) => friend.id)
+                  .toList(growable: false),
+            AudienceMode.selected =>
+              draft.selectedRecipientIds
+                  .intersection(eligible)
+                  .toList(growable: false),
+          };
 
     if (recipientIds.isEmpty && draft.replyToStampId == null) {
       state = state.copyWith(errorMessage: 'Select at least one recipient.');
@@ -126,39 +178,54 @@ class StampTimelineController extends Notifier<StampTimelineState> {
     final MediaUploadRepository uploads = ref.read(
       mediaUploadRepositoryProvider,
     );
-    final List<String> uploadedPublicIds = <String>[];
+    final attempt = existing ?? _PublishAttempt(draft, recipientIds);
+    _attempts[draft.seed] = attempt;
+    if (!attempt.committed) {
+      attempt.draft = attempt.draft.copyWith(
+        audience: draft.audience,
+        selectedRecipientIds: draft.selectedRecipientIds,
+      );
+      attempt.recipients = recipientIds;
+    }
     try {
-      StampDraft finalDraft = draft;
-      if (draft.localImagePath != null) {
+      if (attempt.draft.cloudinaryPublicId == null &&
+          draft.localImagePath != null) {
         final String pubId = await uploads.uploadStamp(draft.localImagePath!);
-        uploadedPublicIds.add(pubId);
-        finalDraft = finalDraft.copyWith(cloudinaryPublicId: pubId);
+        attempt.draft = attempt.draft.copyWith(cloudinaryPublicId: pubId);
+        if (!ref.mounted || generation != _generation) return null;
       }
-      if (draft.localThumbnailPath != null) {
+      if (attempt.draft.cloudinaryThumbnailPublicId == null &&
+          draft.localThumbnailPath != null) {
         final String thumbId = await uploads.uploadThumbnail(
           draft.localThumbnailPath!,
         );
-        uploadedPublicIds.add(thumbId);
-        finalDraft = finalDraft.copyWith(cloudinaryThumbnailPublicId: thumbId);
+        attempt.draft = attempt.draft.copyWith(
+          cloudinaryThumbnailPublicId: thumbId,
+        );
+        if (!ref.mounted || generation != _generation) return null;
       }
-
-      final Stamp stamp = await _repository.publish(
-        draft: finalDraft,
-        recipientIds: recipientIds,
+      // The callable may commit even if its response is lost. Retain these
+      // exact media IDs and recipients so Firebase's requestId remains stable.
+      attempt.committed = true;
+      final Stamp stamp = await repository.publish(
+        draft: attempt.draft,
+        recipientIds: attempt.recipients,
       );
+      attempt.stamp = stamp;
+      if (!ref.mounted || generation != _generation) return null;
       state = state.copyWith(
-        sent: <Stamp>[stamp, ...state.sent],
+        sent: <Stamp>[
+          stamp,
+          ...state.sent.where((item) => item.id != stamp.id),
+        ],
         isPublishing: false,
       );
+      ref.read(stampPublicationProvider.notifier).published(stamp);
       return stamp;
     } on Object catch (error) {
-      for (final String publicId in uploadedPublicIds) {
-        try {
-          await uploads.delete(publicId);
-        } on Object {
-          // Preserve the original publish error; cleanup can be retried later.
-        }
-      }
+      // Never destroy media after an ambiguous publish response. Partial
+      // uploads are also retained for a retry of this same processed draft.
+      if (!ref.mounted || generation != _generation) return null;
       state = state.copyWith(
         isPublishing: false,
         errorMessage: error is MediaUploadException
@@ -167,6 +234,26 @@ class StampTimelineController extends Notifier<StampTimelineState> {
       );
       return null;
     }
+  }
+
+  bool isRetryLocked(StampDraft draft) =>
+      _attempts[draft.seed]?.committed ?? false;
+
+  Future<void> abandon(StampDraft draft) async {
+    final attempt = _attempts[draft.seed];
+    if (attempt == null || attempt.committed) return;
+    final uploads = ref.read(mediaUploadRepositoryProvider);
+    for (final id in <String?>[
+      attempt.draft.cloudinaryPublicId,
+      attempt.draft.cloudinaryThumbnailPublicId,
+    ].whereType<String>()) {
+      try {
+        await uploads.delete(id);
+      } on Object {
+        // Cleanup is best effort; record outstanding media in E2E evidence.
+      }
+    }
+    _attempts.remove(draft.seed);
   }
 
   void removeFromArchive(String stampId) {
@@ -184,4 +271,12 @@ class StampTimelineController extends Notifier<StampTimelineState> {
           .toList(growable: false),
     );
   }
+}
+
+class _PublishAttempt {
+  _PublishAttempt(this.draft, this.recipients);
+  StampDraft draft;
+  List<String> recipients;
+  bool committed = false;
+  Stamp? stamp;
 }

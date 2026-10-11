@@ -6,10 +6,12 @@ abstract final class AppRoutes {
   static const String permissions = '/permissions';
   static const String widgetIntro = '/widget-intro';
 
+  static const String home = '/home';
   static const String inbox = '/inbox';
   static const String camera = '/camera';
   static const String calendar = '/calendar';
   static const String friends = '/friends';
+  static const String profile = '/profile';
 
   static const String cameraPreview = '/camera/preview';
   static const String cameraEditor = '/camera/editor';

@@ -52,20 +52,24 @@ class FriendRequestsScreen extends ConsumerWidget {
                       ),
                       IconButton(
                         tooltip: 'Decline',
-                        onPressed: () {
-                          ref
-                              .read(friendsControllerProvider.notifier)
-                              .declineRequest(friend.id);
-                        },
+                        onPressed: state.busyUserIds.contains(friend.id)
+                            ? null
+                            : () async {
+                                await ref
+                                    .read(friendsControllerProvider.notifier)
+                                    .declineRequest(friend.id);
+                              },
                         icon: const Icon(Icons.close_rounded),
                       ),
                       IconButton.filled(
                         tooltip: 'Accept',
-                        onPressed: () {
-                          ref
-                              .read(friendsControllerProvider.notifier)
-                              .acceptRequest(friend.id);
-                        },
+                        onPressed: state.busyUserIds.contains(friend.id)
+                            ? null
+                            : () async {
+                                await ref
+                                    .read(friendsControllerProvider.notifier)
+                                    .acceptRequest(friend.id);
+                              },
                         icon: const Icon(Icons.check_rounded),
                       ),
                     ],

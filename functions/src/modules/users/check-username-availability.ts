@@ -7,10 +7,10 @@ import { normalizeUsername } from "../../shared/firestore/ids.js";
 import { usernameLookupSchema } from "../../shared/validation/schemas.js";
 
 export const checkUsernameAvailability = onCall(
-  { region, enforceAppCheck: true },
+  { region, enforceAppCheck },
   async (request) => {
     try {
-      const userId = requireAuth(request);
+      const userId = await requireAuth(request);
       const input = usernameLookupSchema.parse(request.data);
       const username = normalizeUsername(input.username);
       const snapshot = await firestore.doc(`usernames/${username}`).get();
@@ -22,3 +22,4 @@ export const checkUsernameAvailability = onCall(
     }
   },
 );
+import { enforceAppCheck } from "../../config/callable-security.js";

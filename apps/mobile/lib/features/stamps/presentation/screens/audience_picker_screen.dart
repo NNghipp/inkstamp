@@ -32,73 +32,77 @@ class AudiencePickerScreen extends ConsumerWidget {
 
     return InkstampScaffold(
       title: 'Send to',
-      body: Column(
-        children: <Widget>[
-          const SizedBox(height: AppSpacing.sm),
-          _AudienceOption(
-            icon: Icons.people_rounded,
-            color: AppColors.sky,
-            title: 'All Friends',
-            subtitle: '${friendsState.friends.length} friends',
-            selected: draft.audience == AudienceMode.allFriends,
-            onTap: () => controller.setAudience(AudienceMode.allFriends),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          _AudienceOption(
-            icon: Icons.star_rounded,
-            color: AppColors.butter,
-            title: 'Close Friends',
-            subtitle: '${friendsState.closeFriends.length} people',
-            selected: draft.audience == AudienceMode.closeFriends,
-            onTap: () => controller.setAudience(AudienceMode.closeFriends),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          _AudienceOption(
-            icon: Icons.tune_rounded,
-            color: AppColors.lilac,
-            title: 'Select People',
-            subtitle: '${draft.selectedRecipientIds.length} selected',
-            selected: draft.audience == AudienceMode.selected,
-            onTap: () => controller.setAudience(AudienceMode.selected),
-          ),
-          if (draft.audience == AudienceMode.selected) ...<Widget>[
-            const SizedBox(height: AppSpacing.md),
-            Expanded(
-              child: ListView.separated(
-                itemCount: friendsState.friends.length,
-                separatorBuilder: (context, index) {
-                  return const Divider(height: 1);
-                },
-                itemBuilder: (context, index) {
-                  final InkstampFriend friend = friendsState.friends[index];
-                  final bool selected = draft.selectedRecipientIds.contains(
-                    friend.id,
-                  );
-                  return CheckboxListTile(
-                    value: selected,
-                    onChanged: (_) => controller.toggleRecipient(friend.id),
-                    secondary: UserAvatar(name: friend.displayName),
-                    title: Text(friend.displayName),
-                    subtitle: Text('@${friend.username}'),
-                    activeColor: AppColors.ink,
-                    contentPadding: EdgeInsets.zero,
-                  );
-                },
-              ),
+      body: friendsState.isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
+              children: <Widget>[
+                const SizedBox(height: AppSpacing.sm),
+                _AudienceOption(
+                  icon: Icons.people_rounded,
+                  color: AppColors.sky,
+                  title: 'All Friends',
+                  subtitle: '${friendsState.friends.length} friends',
+                  selected: draft.audience == AudienceMode.allFriends,
+                  onTap: () => controller.setAudience(AudienceMode.allFriends),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                _AudienceOption(
+                  icon: Icons.star_rounded,
+                  color: AppColors.butter,
+                  title: 'Close Friends',
+                  subtitle: '${friendsState.closeFriends.length} people',
+                  selected: draft.audience == AudienceMode.closeFriends,
+                  onTap: () =>
+                      controller.setAudience(AudienceMode.closeFriends),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                _AudienceOption(
+                  icon: Icons.tune_rounded,
+                  color: AppColors.lilac,
+                  title: 'Select People',
+                  subtitle: '${draft.selectedRecipientIds.length} selected',
+                  selected: draft.audience == AudienceMode.selected,
+                  onTap: () => controller.setAudience(AudienceMode.selected),
+                ),
+                if (draft.audience == AudienceMode.selected) ...<Widget>[
+                  const SizedBox(height: AppSpacing.md),
+                  Expanded(
+                    child: ListView.separated(
+                      itemCount: friendsState.friends.length,
+                      separatorBuilder: (context, index) {
+                        return const Divider(height: 1);
+                      },
+                      itemBuilder: (context, index) {
+                        final InkstampFriend friend =
+                            friendsState.friends[index];
+                        final bool selected = draft.selectedRecipientIds
+                            .contains(friend.id);
+                        return CheckboxListTile(
+                          value: selected,
+                          onChanged: (_) =>
+                              controller.toggleRecipient(friend.id),
+                          secondary: UserAvatar(name: friend.displayName),
+                          title: Text(friend.displayName),
+                          subtitle: Text('@${friend.username}'),
+                          activeColor: AppColors.ink,
+                          contentPadding: EdgeInsets.zero,
+                        );
+                      },
+                    ),
+                  ),
+                ] else
+                  const Spacer(),
+                const SizedBox(height: AppSpacing.md),
+                InkstampButton(
+                  label: 'Send to $recipientCount people',
+                  icon: Icons.send_rounded,
+                  onPressed: recipientCount == 0
+                      ? null
+                      : () => context.push(AppRoutes.cameraSending),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+              ],
             ),
-          ] else
-            const Spacer(),
-          const SizedBox(height: AppSpacing.md),
-          InkstampButton(
-            label: 'Send to $recipientCount people',
-            icon: Icons.send_rounded,
-            onPressed: recipientCount == 0
-                ? null
-                : () => context.push(AppRoutes.cameraSending),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-        ],
-      ),
     );
   }
 }

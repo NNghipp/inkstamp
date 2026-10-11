@@ -20,7 +20,7 @@ export const reactToStamp = onCall(
   { region, enforceAppCheck: true },
   async (request) => {
     try {
-      const userId = requireAuth(request);
+      const userId = await requireAuth(request);
       const input = reactToStampSchema.parse(request.data);
       const deliveryReference = firestore.doc(
         `users/${userId}/deliveries/${input.stampId}`,

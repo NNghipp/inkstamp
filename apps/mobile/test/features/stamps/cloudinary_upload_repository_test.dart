@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -17,6 +18,62 @@ void main() {
   });
 
   tearDown(() => directory.delete(recursive: true));
+
+  test(
+    'PNG stamp and thumbnail preserve format and version through upload',
+    () async {
+      final png = await File(
+        '${directory.path}/photo_stamp_v1.png',
+      ).writeAsBytes([137, 80, 78, 71]);
+      for (final kind in ['stamp', 'thumbnail']) {
+        var calls = 0;
+        final client = MockClient((request) async {
+          calls++;
+          if (calls == 1) {
+            expect(jsonDecode(request.body), {
+              'mediaKind': kind,
+              'imageFormat': 'stamp_png_v1',
+            });
+            return http.Response(
+              jsonEncode({
+                'uploadUrl': 'https://api.cloudinary.com/upload',
+                'apiKey': 'key',
+                'parameters': {
+                  'folder': 'inkstamp/user',
+                  'public_id': '$kind/id_stamp_v1',
+                  'format': 'png',
+                },
+              }),
+              200,
+            );
+          }
+          expect(
+            utf8.decode(request.bodyBytes, allowMalformed: true).toLowerCase(),
+            contains('content-type: image/png'),
+          );
+          return http.Response(
+            jsonEncode({
+              'resource_type': 'image',
+              'format': 'png',
+              'public_id': 'inkstamp/user/$kind/id_stamp_v1',
+            }),
+            200,
+          );
+        });
+        final repo = CloudinaryUploadRepository(
+          gatewayBaseUrl: 'http://localhost',
+          authToken: () async => 'test',
+          appCheckToken: () async => null,
+          client: client,
+        );
+        final id = kind == 'stamp'
+            ? await repo.uploadStamp(png.path)
+            : await repo.uploadThumbnail(png.path);
+        expect(id, 'inkstamp/user/$kind/id_stamp_v1');
+        expect(calls, 2);
+      }
+    },
+  );
 
   test(
     'uploads using gateway tokens and validates Cloudinary response',
@@ -52,6 +109,34 @@ void main() {
       expect(calls, 2);
     },
   );
+
+  test('rejects a legacy gateway before uploading a new alpha stamp', () async {
+    final png = await File(
+      '${directory.path}/photo_stamp_v1.png',
+    ).writeAsBytes([1]);
+    var calls = 0;
+    final repo = CloudinaryUploadRepository(
+      gatewayBaseUrl: 'http://localhost',
+      authToken: () async => 'test',
+      appCheckToken: () async => null,
+      client: MockClient((_) async {
+        calls++;
+        return http.Response(
+          jsonEncode({
+            'uploadUrl': 'https://api.cloudinary.com/upload',
+            'apiKey': 'key',
+            'parameters': {'folder': 'inkstamp/user', 'public_id': 'stamp/old'},
+          }),
+          200,
+        );
+      }),
+    );
+    await expectLater(
+      repo.uploadStamp(png.path),
+      throwsA(isA<MediaUploadException>()),
+    );
+    expect(calls, 1);
+  });
 
   test('rejects missing, non-JPEG and oversized files', () async {
     final repository = CloudinaryUploadRepository(

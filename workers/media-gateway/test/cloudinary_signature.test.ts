@@ -17,6 +17,15 @@ describe("createCloudinarySignature", () => {
 });
 
 describe("generateDeliveryUrl", () => {
+  it("preserves PNG alpha for versioned stamps without changing legacy URLs", async () => {
+    const input = { cloudName: "inkstamp", apiKey: "key", apiSecret: "secret" };
+    const png = new URL(await generateDeliveryUrl({ ...input,
+      publicId: "inkstamp/user-1/stamp/id_stamp_v1" }));
+    const old = new URL(await generateDeliveryUrl({ ...input,
+      publicId: "inkstamp/user-1/stamp/id" }));
+    expect(png.searchParams.get("format")).toBe("png");
+    expect(old.searchParams.has("format")).toBe(false);
+  });
   it("creates a short-lived authenticated download URL", async () => {
     const value = await generateDeliveryUrl({
       cloudName: "inkstamp",
@@ -37,6 +46,18 @@ describe("generateDeliveryUrl", () => {
 });
 
 describe("CreateUploadSignature", () => {
+  it("signs PNG and a versioned ID for both stamp and thumbnail", async () => {
+    for (const mediaKind of ["stamp", "thumbnail"] as const) {
+      const result = await new CreateUploadSignature({ apiKey: "key",
+        apiSecret: "secret", cloudName: "inkstamp", uploadPreset: "preset" },
+        () => 1, () => "id").execute({ userId: "user", mediaKind,
+          imageFormat: "stamp_png_v1" });
+      expect(result.parameters.format).toBe("png");
+      expect(result.parameters.public_id).toBe(`${mediaKind}/id_stamp_v1`);
+      const { signature, ...parameters } = result.parameters;
+      expect(signature).toBe(await createCloudinarySignature({ parameters, apiSecret: "secret" }));
+    }
+  });
   it("creates an authenticated, user-scoped Cloudinary upload", async () => {
     const result = await new CreateUploadSignature(
       {
@@ -50,13 +71,14 @@ describe("CreateUploadSignature", () => {
     ).execute({ userId: "user-1", mediaKind: "stamp" });
 
     expect(result.uploadUrl).toBe(
-      "https://api.cloudinary.com/v1_1/inkstamp/image/authenticated",
+      "https://api.cloudinary.com/v1_1/inkstamp/image/upload",
     );
     expect(result.parameters).toMatchObject({
       folder: "inkstamp/user-1",
       public_id: "stamp/media-id",
       timestamp: "1700000000",
       upload_preset: "inkstamp_private_images",
+      type: "authenticated",
     });
     expect(result.parameters.signature).toMatch(/^[a-f0-9]{64}$/);
   });

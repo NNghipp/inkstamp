@@ -47,11 +47,13 @@ class CloseFriendsScreen extends ConsumerWidget {
                 final InkstampFriend friend = state.friends[index];
                 return SwitchListTile(
                   value: friend.isCloseFriend,
-                  onChanged: (_) {
-                    ref
-                        .read(friendsControllerProvider.notifier)
-                        .toggleCloseFriend(friend.id);
-                  },
+                  onChanged: state.busyUserIds.contains(friend.id)
+                      ? null
+                      : (_) async {
+                          await ref
+                              .read(friendsControllerProvider.notifier)
+                              .toggleCloseFriend(friend.id);
+                        },
                   secondary: UserAvatar(name: friend.displayName),
                   title: Text(friend.displayName),
                   subtitle: Text('@${friend.username}'),

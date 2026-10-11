@@ -1,0 +1,13 @@
+flowchart TB
+  UI[Flutter screens] --> App[Riverpod orchestration]
+  App --> Domain[Domain entities and repository contracts]
+  Domain --> Data[SDK-backed repositories]
+  Data --> Auth[Firebase Auth]
+  Data --> DB[Real DEV Firestore]
+  Data --> Fn[Local callable Functions]
+  Fn --> DB
+  Data --> Gateway[Local media Worker]
+  Gateway --> Auth
+  Gateway --> DB
+  Gateway --> Media[Authenticated Cloudinary assets]
+  DB --> Memories[Deliveries: Inbox and Calendar]

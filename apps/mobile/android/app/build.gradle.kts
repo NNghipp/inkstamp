@@ -1,3 +1,6 @@
+import java.util.Properties
+import java.util.Base64
+
 plugins {
     id("com.android.application")
     // START: FlutterFire Configuration
@@ -6,6 +9,47 @@ plugins {
     // END: FlutterFire Configuration
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+}
+
+val signingPropertiesFile = rootProject.file("key.properties")
+val releaseSigning = Properties().apply {
+    if (signingPropertiesFile.isFile) signingPropertiesFile.inputStream().use { load(it) }
+}
+val hasReleaseSigning = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
+    .all { !releaseSigning.getProperty(it).isNullOrBlank() }
+
+gradle.taskGraph.whenReady {
+    if (allTasks.any { it.project == project && it.name.contains("Release", ignoreCase = true) }) {
+        check(hasReleaseSigning) {
+            "Release signing is not configured. Provide ignored android/key.properties; debug signing is forbidden."
+        }
+        val keyFile = rootProject.file(releaseSigning.getProperty("storeFile"))
+        check(keyFile.isFile && keyFile.name != "debug.keystore" &&
+            releaseSigning.getProperty("keyAlias") != "androiddebugkey") {
+            "A non-debug release signing key is required."
+        }
+        val definitions = (project.findProperty("dart-defines") as? String).orEmpty()
+            .split(',').filter { it.isNotBlank() }.associate {
+                val decoded = String(Base64.getDecoder().decode(it))
+                decoded.substringBefore('=') to decoded.substringAfter('=', "")
+            }
+        check(definitions["APP_ENV"] == "prod" &&
+            definitions["FIREBASE_PROJECT_ID"]?.let { it.isNotBlank() && it != "inkstamp-dev" } == true &&
+            definitions["MEDIA_GATEWAY_BASE_URL"]?.startsWith("https://") == true &&
+            definitions["FUNCTIONS_REGION"]?.isNotBlank() == true &&
+            definitions["ENABLE_DEV_TEST_AUTH"] != "true" &&
+            definitions["BACKEND_MODE"] != "functions_emulator" &&
+            definitions["DEMO_MODE"] != "true") {
+            "Release requires explicit isolated PROD configuration; DEV flags are forbidden."
+        }
+        val firebaseConfig = file("google-services.json")
+        check(firebaseConfig.isFile) { "Production Firebase Android registration required." }
+        val config = groovy.json.JsonSlurper().parse(firebaseConfig) as Map<*, *>
+        val firebaseProject = config["project_info"] as? Map<*, *>
+        check(firebaseProject?.get("project_id") == definitions["FIREBASE_PROJECT_ID"]) {
+            "google-services.json does not match the production Firebase project."
+        }
+    }
 }
 
 android {
@@ -32,11 +76,20 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("production") {
+                storeFile = rootProject.file(releaseSigning.getProperty("storeFile"))
+                storePassword = releaseSigning.getProperty("storePassword")
+                keyAlias = releaseSigning.getProperty("keyAlias")
+                keyPassword = releaseSigning.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("production")
         }
     }
 }

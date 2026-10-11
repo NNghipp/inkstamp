@@ -7,6 +7,7 @@ import 'package:inkstamp/app/theme/app_spacing.dart';
 import 'package:inkstamp/core/widgets/inkstamp_button.dart';
 import 'package:inkstamp/core/widgets/inkstamp_scaffold.dart';
 import 'package:inkstamp/core/widgets/stamp_artwork.dart';
+import 'package:inkstamp/features/camera/presentation/controllers/camera_controller.dart';
 import 'package:inkstamp/features/stamps/domain/entities/stamp.dart';
 import 'package:inkstamp/features/stamps/domain/entities/stamp_draft.dart';
 import 'package:inkstamp/features/stamps/presentation/controllers/stamp_composer_controller.dart';
@@ -48,6 +49,7 @@ class _StampSendingScreenState extends ConsumerState<StampSendingScreen> {
               seed: draft.seed,
               frameStyle: draft.frameStyle,
               paperTone: draft.paperTone,
+              localImagePath: draft.localImagePath,
             ),
           ),
           const SizedBox(height: AppSpacing.xl),
@@ -86,6 +88,9 @@ class _StampSendingScreenState extends ConsumerState<StampSendingScreen> {
     final Stamp? stamp = await ref
         .read(stampTimelineControllerProvider.notifier)
         .publish(draft);
+    if (stamp != null && mounted) {
+      await ref.read(cameraControllerProvider.notifier).finishDraft(draft);
+    }
     if (stamp != null && mounted) {
       context.go(AppRoutes.cameraSuccess);
     }

@@ -50,11 +50,13 @@ class FriendProfileScreen extends ConsumerWidget {
           const SizedBox(height: AppSpacing.xl),
           SwitchListTile(
             value: friend.isCloseFriend,
-            onChanged: (_) {
-              ref
-                  .read(friendsControllerProvider.notifier)
-                  .toggleCloseFriend(friend.id);
-            },
+            onChanged: state.busyUserIds.contains(friend.id)
+                ? null
+                : (_) async {
+                    await ref
+                        .read(friendsControllerProvider.notifier)
+                        .toggleCloseFriend(friend.id);
+                  },
             title: const Text('Close Friends'),
             secondary: const Icon(Icons.star_rounded, color: AppColors.butter),
             contentPadding: EdgeInsets.zero,
@@ -63,12 +65,14 @@ class FriendProfileScreen extends ConsumerWidget {
           InkstampButton(
             label: 'Remove friend',
             isSecondary: true,
-            onPressed: () {
-              ref
-                  .read(friendsControllerProvider.notifier)
-                  .removeFriend(friend.id);
-              context.pop();
-            },
+            onPressed: state.busyUserIds.contains(friend.id)
+                ? null
+                : () async {
+                    final bool removed = await ref
+                        .read(friendsControllerProvider.notifier)
+                        .removeFriend(friend.id);
+                    if (removed && context.mounted) context.pop();
+                  },
           ),
           const SizedBox(height: AppSpacing.sm),
           TextButton.icon(
@@ -110,8 +114,10 @@ class FriendProfileScreen extends ConsumerWidget {
       },
     );
     if (confirmed == true && context.mounted) {
-      ref.read(friendsControllerProvider.notifier).blockFriend(friend.id);
-      context.pop();
+      final bool blocked = await ref
+          .read(friendsControllerProvider.notifier)
+          .blockFriend(friend.id);
+      if (blocked && context.mounted) context.pop();
     }
   }
 }

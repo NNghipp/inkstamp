@@ -21,10 +21,10 @@ import {
 } from "../../shared/validation/schemas.js";
 
 export const findUserByUsername = onCall(
-  { region, enforceAppCheck: true },
+  { region, enforceAppCheck },
   async (request) => {
     try {
-      const userId = requireAuth(request);
+      const userId = await requireAuth(request);
       const input = usernameLookupSchema.parse(request.data);
       const username = normalizeUsername(input.username);
       const usernameSnapshot = await firestore.doc(`usernames/${username}`).get();
@@ -39,6 +39,12 @@ export const findUserByUsername = onCall(
       if (!profile.exists || profile.get("status") === "suspended") {
         return { user: null };
       }
+      const relationship = await firestore
+        .doc(`friendships/${friendshipId(userId, targetUserId)}`)
+        .get();
+      if (relationship.exists && relationship.get("status") === "blocked") {
+        return { user: null };
+      }
       const profileUsername = profile.get("username") as string;
       const profileDisplayName = profile.get("displayName") as string;
       return {
@@ -46,6 +52,11 @@ export const findUserByUsername = onCall(
           id: targetUserId,
           username: profileUsername,
           displayName: profileDisplayName,
+          relationshipStatus: relationship.exists
+            ? relationship.get("status") as string
+            : "none",
+          isIncomingRequest:
+            relationship.exists && relationship.get("requestedTo") === userId,
         },
       };
     } catch (error) {
@@ -55,17 +66,11 @@ export const findUserByUsername = onCall(
 );
 
 export const sendFriendRequest = onCall(
-  { region, enforceAppCheck: true },
+  { region, enforceAppCheck },
   async (request) => {
     try {
-      const userId = requireAuth(request);
+      const userId = await requireAuth(request);
       const input = usernameLookupSchema.parse(request.data);
-      await consumeDailyQuota(
-        userId,
-        "friendRequests",
-        maxDailyFriendRequests,
-      );
-
       const usernameSnapshot = await firestore
         .doc(`usernames/${normalizeUsername(input.username)}`)
         .get();
@@ -95,6 +100,14 @@ export const sendFriendRequest = onCall(
 
       const pairId = friendshipId(userId, targetUserId);
       const reference = firestore.doc(`friendships/${pairId}`);
+      const existingRelationship = await reference.get();
+      if (!existingRelationship.exists) {
+        await consumeDailyQuota(
+          userId,
+          "friendRequests",
+          maxDailyFriendRequests,
+        );
+      }
       const [senderProfile, targetProfile] = await Promise.all([
         firestore.doc(`users/${userId}`).get(),
         firestore.doc(`users/${targetUserId}`).get(),
@@ -112,6 +125,25 @@ export const sendFriendRequest = onCall(
           );
         }
         if (snapshot.exists) {
+          if (snapshot.get("status") === "accepted") {
+            return;
+          }
+          if (
+            snapshot.get("status") === "pending" &&
+            snapshot.get("requestedBy") === userId
+          ) {
+            return;
+          }
+          if (
+            snapshot.get("status") === "pending" &&
+            snapshot.get("requestedTo") === userId
+          ) {
+            transaction.update(reference, {
+              status: "accepted",
+              updatedAt: FieldValue.serverTimestamp(),
+            });
+            return;
+          }
           throw new HttpsError(
             "already-exists",
             "A connection already exists.",
@@ -145,15 +177,23 @@ export const sendFriendRequest = onCall(
 );
 
 export const respondFriendRequest = onCall(
-  { region, enforceAppCheck: true },
+  { region, enforceAppCheck },
   async (request) => {
     try {
-      const userId = requireAuth(request);
+      const userId = await requireAuth(request);
       const input = friendResponseSchema.parse(request.data);
       const pairId = friendshipId(userId, input.userId);
       const reference = firestore.doc(`friendships/${pairId}`);
       await firestore.runTransaction(async (transaction) => {
         const snapshot = await transaction.get(reference);
+        if (
+          snapshot.exists &&
+          snapshot.get("status") === "accepted" &&
+          input.accept &&
+          (snapshot.get("members") as string[]).includes(userId)
+        ) {
+          return;
+        }
         if (
           !snapshot.exists ||
           snapshot.get("status") !== "pending" ||
@@ -181,14 +221,25 @@ export const respondFriendRequest = onCall(
 );
 
 export const removeFriend = onCall(
-  { region, enforceAppCheck: true },
+  { region, enforceAppCheck },
   async (request) => {
     try {
-      const userId = requireAuth(request);
+      const userId = await requireAuth(request);
       const input = userIdSchema.parse(request.data);
       const pairId = friendshipId(userId, input.userId);
+      const friendshipReference = firestore.doc(`friendships/${pairId}`);
+      await firestore.runTransaction(async (transaction) => {
+        const snapshot = await transaction.get(friendshipReference);
+        if (!snapshot.exists) return;
+        if (snapshot.get("status") === "blocked") {
+          throw new HttpsError(
+            "permission-denied",
+            "A blocked connection cannot be removed this way.",
+          );
+        }
+        transaction.delete(friendshipReference);
+      });
       await Promise.all([
-        firestore.doc(`friendships/${pairId}`).delete(),
         firestore.doc(`users/${userId}/closeFriends/${input.userId}`).delete(),
         firestore.doc(`users/${input.userId}/closeFriends/${userId}`).delete(),
       ]);
@@ -200,34 +251,30 @@ export const removeFriend = onCall(
 );
 
 export const updateCloseFriends = onCall(
-  { region, enforceAppCheck: true },
+  { region, enforceAppCheck },
   async (request) => {
     try {
-      const userId = requireAuth(request);
+      const userId = await requireAuth(request);
       const input = closeFriendSchema.parse(request.data);
-      const friendship = await firestore
-        .doc(`friendships/${friendshipId(userId, input.friendId)}`)
-        .get();
-      if (!friendship.exists || friendship.get("status") !== "accepted") {
-        throw new HttpsError(
-          "failed-precondition",
-          "Only accepted friends can be added.",
-        );
-      }
       const reference = firestore.doc(
         `users/${userId}/closeFriends/${input.friendId}`,
       );
-      if (input.enabled) {
-        await reference.set({
-          friendId: input.friendId,
-          createdAt: FieldValue.serverTimestamp(),
+      await firestore.runTransaction(async (transaction) => {
+        const friendship = await transaction.get(
+          firestore.doc(`friendships/${friendshipId(userId, input.friendId)}`));
+        if (!friendship.exists || friendship.get("status") !== "accepted" ||
+            !(friendship.get("members") as string[]).includes(userId)) {
+          throw new HttpsError("failed-precondition", "Only accepted friends can be added.");
+        }
+        if (input.enabled) transaction.set(reference, {
+          friendId: input.friendId, createdAt: FieldValue.serverTimestamp(),
         });
-      } else {
-        await reference.delete();
-      }
+        else transaction.delete(reference);
+      });
       return { enabled: input.enabled };
     } catch (error) {
       throw toHttpsError(error);
     }
   },
 );
+import { enforceAppCheck } from "../../config/callable-security.js";

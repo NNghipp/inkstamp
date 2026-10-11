@@ -4,8 +4,10 @@ import 'package:inkstamp/app/theme/app_colors.dart';
 import 'package:inkstamp/app/theme/app_spacing.dart';
 import 'package:inkstamp/core/widgets/inkstamp_button.dart';
 import 'package:inkstamp/core/widgets/inkstamp_scaffold.dart';
+import 'package:inkstamp/features/authentication/domain/dev_auth_policy.dart';
 import 'package:inkstamp/features/authentication/domain/use_cases/sign_in.dart';
 import 'package:inkstamp/features/authentication/presentation/controllers/session_controller.dart';
+import 'package:inkstamp/features/authentication/presentation/widgets/dev_test_login.dart';
 
 class SignInScreen extends ConsumerWidget {
   const SignInScreen({super.key});
@@ -93,6 +95,7 @@ class SignInScreen extends ConsumerWidget {
             style: TextStyle(fontSize: 12, color: AppColors.charcoal),
           ),
           const SizedBox(height: AppSpacing.lg),
+          if (DevAuthPolicy.compiledEnabled) const DevTestLogin(),
         ],
       ),
     );

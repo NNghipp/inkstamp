@@ -23,6 +23,12 @@ class InMemoryAuthenticationRepository implements AuthenticationRepository {
   Future<AppUser> signInWithGoogle() => _demoSignIn();
 
   @override
+  Future<AppUser> signInForDevelopment({
+    required String email,
+    required String password,
+  }) async => throw StateError('DEV auth requires real Firebase.');
+
+  @override
   Future<void> signOut() async {}
 
   @override

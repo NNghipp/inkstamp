@@ -37,6 +37,13 @@ export class InMemoryRateLimiter implements RateLimiter {
     scope: RateLimitScope;
   }): Promise<RateLimitDecision> {
     const now = this.now();
+    // Local/best-effort limiter only: bound memory and remove expired entries.
+    if (this.counters.size >= 1000) {
+      for (const [key, counter] of this.counters) {
+        if (counter.resetAt <= now) this.counters.delete(key);
+      }
+      if (this.counters.size >= 10000) return { allowed: false, retryAfterSeconds: 60 };
+    }
     const ipDecision = this.consume(`ip:${ip}`, this.maxIpLimit, now);
     if (!ipDecision.allowed) return ipDecision;
     return this.consume(`user:${userId}:${scope}`, this.limits[scope], now);

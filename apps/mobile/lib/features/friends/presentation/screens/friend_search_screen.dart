@@ -10,7 +10,9 @@ import 'package:inkstamp/features/friends/presentation/controllers/friends_contr
 import 'package:inkstamp/features/friends/presentation/widgets/friend_tile.dart';
 
 class FriendSearchScreen extends ConsumerStatefulWidget {
-  const FriendSearchScreen({super.key});
+  const FriendSearchScreen({this.initialUsername, super.key});
+
+  final String? initialUsername;
 
   @override
   ConsumerState<FriendSearchScreen> createState() {
@@ -20,10 +22,25 @@ class FriendSearchScreen extends ConsumerStatefulWidget {
 
 class _FriendSearchScreenState extends ConsumerState<FriendSearchScreen> {
   Timer? _debounce;
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialUsername ?? '');
+    if (_controller.text.isNotEmpty) {
+      Future<void>.microtask(
+        () => ref
+            .read(friendsControllerProvider.notifier)
+            .search(_controller.text),
+      );
+    }
+  }
 
   @override
   void dispose() {
     _debounce?.cancel();
+    _controller.dispose();
     super.dispose();
   }
 
@@ -37,6 +54,7 @@ class _FriendSearchScreenState extends ConsumerState<FriendSearchScreen> {
         children: <Widget>[
           const SizedBox(height: AppSpacing.sm),
           TextField(
+            controller: _controller,
             autofocus: true,
             autocorrect: false,
             onChanged: _onQueryChanged,
@@ -46,6 +64,14 @@ class _FriendSearchScreenState extends ConsumerState<FriendSearchScreen> {
             ),
           ),
           const SizedBox(height: AppSpacing.md),
+          if (state.errorMessage != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+              child: Text(
+                state.errorMessage!,
+                style: const TextStyle(color: AppColors.danger),
+              ),
+            ),
           if (state.isLoading)
             const LinearProgressIndicator(color: AppColors.ink)
           else
@@ -64,29 +90,49 @@ class _FriendSearchScreenState extends ConsumerState<FriendSearchScreen> {
                             state.searchResults[index];
                         return FriendTile(
                           friend: friend,
-                          trailing: friend.status == FriendStatus.accepted
-                              ? const Icon(
-                                  Icons.check_circle_rounded,
-                                  color: AppColors.success,
-                                )
-                              : FilledButton(
-                                  onPressed: () {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          'Friend request sent to ${friend.displayName}.',
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                  child: const Text('Add'),
-                                ),
+                          trailing: _trailing(context, state, friend),
                         );
                       },
                     ),
             ),
         ],
       ),
+    );
+  }
+
+  Widget _trailing(
+    BuildContext context,
+    FriendsState state,
+    InkstampFriend friend,
+  ) {
+    if (friend.status == FriendStatus.accepted) {
+      return const Icon(Icons.check_circle_rounded, color: AppColors.success);
+    }
+    if (friend.status == FriendStatus.pending) {
+      return const Chip(label: Text('Pending'));
+    }
+    if (friend.status == FriendStatus.blocked) {
+      return const Chip(label: Text('Blocked'));
+    }
+    final bool busy = state.busyUserIds.contains(friend.id);
+    return FilledButton(
+      onPressed: busy
+          ? null
+          : () async {
+              final bool sent = await ref
+                  .read(friendsControllerProvider.notifier)
+                  .sendRequest(friend);
+              if (sent && context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Friend request sent to ${friend.displayName}.',
+                    ),
+                  ),
+                );
+              }
+            },
+      child: Text(busy ? 'Sending…' : 'Add'),
     );
   }
 

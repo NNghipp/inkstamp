@@ -8,6 +8,8 @@ import 'package:inkstamp/core/widgets/inkstamp_button.dart';
 import 'package:inkstamp/core/widgets/inkstamp_scaffold.dart';
 import 'package:inkstamp/core/widgets/stamp_artwork.dart';
 import 'package:inkstamp/core/widgets/user_avatar.dart';
+import 'package:inkstamp/features/authentication/presentation/controllers/session_controller.dart';
+import 'package:inkstamp/features/inbox/presentation/controllers/inbox_controller.dart';
 import 'package:inkstamp/features/inbox/presentation/widgets/reaction_bar.dart';
 import 'package:inkstamp/features/stamps/domain/entities/stamp.dart';
 import 'package:inkstamp/features/stamps/presentation/controllers/stamp_timeline_controller.dart';
@@ -23,28 +25,44 @@ class StampDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _StampDetailScreenState extends ConsumerState<StampDetailScreen> {
-  @override
-  void initState() {
-    super.initState();
-    Future<void>.microtask(() {
-      ref
-          .read(stampTimelineControllerProvider.notifier)
-          .markSeen(widget.stampId);
-    });
-  }
+  String? _readScheduledFor;
 
   @override
   Widget build(BuildContext context) {
-    ref.watch(stampTimelineControllerProvider);
-    final Stamp? stamp = ref
-        .read(stampTimelineControllerProvider.notifier)
-        .findById(widget.stampId);
+    final detail = ref.watch(stampDetailProvider(widget.stampId));
+    if (detail.isLoading && (detail.isReloading || !detail.hasValue)) {
+      return const InkstampScaffold(
+        title: 'Stamp',
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (detail.hasError) {
+      return InkstampScaffold(
+        title: 'Stamp',
+        body: Center(
+          child: TextButton(
+            onPressed: () =>
+                ref.invalidate(stampDetailProvider(widget.stampId)),
+            child: const Text('Không thể tải stamp. Thử lại'),
+          ),
+        ),
+      );
+    }
+    final Stamp? stamp = detail.value;
 
     if (stamp == null) {
       return const InkstampScaffold(
         title: 'Stamp',
-        body: Center(child: Text('This stamp is no longer available.')),
+        body: Center(child: Text('Stamp không còn khả dụng.')),
       );
+    }
+    final readKey =
+        '${ref.watch(sessionControllerProvider).user?.id}/${stamp.id}';
+    if (_readScheduledFor != readKey) {
+      _readScheduledFor = readKey;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) ref.read(inboxControllerProvider.notifier).markRead(stamp);
+      });
     }
 
     return InkstampScaffold(
@@ -52,21 +70,16 @@ class _StampDetailScreenState extends ConsumerState<StampDetailScreen> {
       actions: <Widget>[
         PopupMenuButton<String>(
           onSelected: (String value) {
-            if (value == 'report') {
+            if (value == 'report' && !stamp.isSentByMe) {
               context.push(AppRoutes.stampReport(stamp.id));
-            } else if (value == 'remove') {
-              ref
-                  .read(stampTimelineControllerProvider.notifier)
-                  .removeFromArchive(stamp.id);
-              context.pop();
             }
           },
-          itemBuilder: (context) => const <PopupMenuEntry<String>>[
-            PopupMenuItem<String>(value: 'report', child: Text('Report')),
-            PopupMenuItem<String>(
-              value: 'remove',
-              child: Text('Remove from archive'),
-            ),
+          itemBuilder: (context) => <PopupMenuEntry<String>>[
+            if (!stamp.isSentByMe)
+              const PopupMenuItem<String>(
+                value: 'report',
+                child: Text('Report'),
+              ),
           ],
         ),
       ],
@@ -84,7 +97,9 @@ class _StampDetailScreenState extends ConsumerState<StampDetailScreen> {
                     style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                   Text(
-                    DateFormat('HH:mm · dd/MM/yyyy').format(stamp.createdAt),
+                    DateFormat(
+                      'HH:mm · dd/MM/yyyy',
+                    ).format(stamp.createdAt.toLocal()),
                     style: const TextStyle(
                       color: AppColors.charcoal,
                       fontSize: 12,
@@ -94,18 +109,30 @@ class _StampDetailScreenState extends ConsumerState<StampDetailScreen> {
               ),
             ],
           ),
-          const Spacer(),
-          SizedBox(
-            width: MediaQuery.sizeOf(context).width * 0.82,
-            child: StampArtwork(
-              seed: stamp.seed,
-              frameStyle: stamp.frameStyle,
-              paperTone: stamp.paperTone,
-              publicId: stamp.cloudinaryPublicId,
-              heroTag: 'stamp-${stamp.id}',
+          Expanded(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.sizeOf(context).width * 0.82,
+                ),
+                child: AspectRatio(
+                  aspectRatio: 1,
+                  child: StampArtwork(
+                    seed: stamp.seed,
+                    frameStyle: stamp.frameStyle,
+                    paperTone: stamp.paperTone,
+                    publicId: stamp.cloudinaryPublicId,
+                  ),
+                ),
+              ),
             ),
           ),
-          const Spacer(),
+          if (stamp.shortTitle.isNotEmpty)
+            Text(
+              stamp.shortTitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ReactionBar(
             selected: stamp.reaction,
             onSelected: (ReactionType reaction) {

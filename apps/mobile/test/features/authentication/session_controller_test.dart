@@ -96,6 +96,11 @@ class FakeAuthenticationRepository implements AuthenticationRepository {
   @override
   Future<AppUser> signInWithGoogle() => _signIn();
   @override
+  Future<AppUser> signInForDevelopment({
+    required String email,
+    required String password,
+  }) => _signIn();
+  @override
   Future<bool> isUsernameAvailable(String username) async =>
       username.toLowerCase() != 'taken';
   @override

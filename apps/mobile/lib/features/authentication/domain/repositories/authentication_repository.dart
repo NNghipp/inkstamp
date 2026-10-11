@@ -7,6 +7,12 @@ abstract interface class AuthenticationRepository {
 
   Future<AppUser> signInWithGoogle();
 
+  /// Real Firebase email/password sign-in, guarded at the repository boundary.
+  Future<AppUser> signInForDevelopment({
+    required String email,
+    required String password,
+  });
+
   Future<bool> isUsernameAvailable(String username);
 
   Future<AppUser> updateProfile({

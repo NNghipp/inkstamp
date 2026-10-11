@@ -6,8 +6,8 @@ import 'package:inkstamp/app/theme/app_colors.dart';
 import 'package:inkstamp/app/theme/app_spacing.dart';
 import 'package:inkstamp/core/widgets/inkstamp_button.dart';
 import 'package:inkstamp/core/widgets/inkstamp_scaffold.dart';
+import 'package:inkstamp/features/camera/presentation/controllers/camera_controller.dart';
 import 'package:inkstamp/features/stamps/domain/entities/stamp.dart';
-import 'package:inkstamp/features/stamps/presentation/controllers/stamp_composer_controller.dart';
 import 'package:inkstamp/features/stamps/presentation/controllers/stamp_timeline_controller.dart';
 
 class StampReplyScreen extends ConsumerWidget {
@@ -58,10 +58,11 @@ class StampReplyScreen extends ConsumerWidget {
             label: 'Open camera',
             onPressed: stamp == null
                 ? null
-                : () {
-                    ref
-                        .read(stampComposerControllerProvider.notifier)
-                        .capture(replyToStampId: stamp.id);
+                : () async {
+                    await ref
+                        .read(cameraControllerProvider.notifier)
+                        .prepareCapture(replyToStampId: stamp.id);
+                    if (!context.mounted) return;
                     context.go(AppRoutes.camera);
                   },
           ),

@@ -2,18 +2,18 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
+import 'package:inkstamp/core/config/app_environment.dart';
+import 'package:inkstamp/core/config/functions_backend.dart';
+import 'package:inkstamp/core/images/stamp_image_format.dart';
 import 'package:inkstamp/features/authentication/presentation/controllers/session_controller.dart';
 import 'package:inkstamp/features/stamps/domain/repositories/media_upload_repository.dart';
 import 'package:uuid/uuid.dart';
 
-const String mediaGatewayBaseUrl = String.fromEnvironment(
-  'MEDIA_GATEWAY_BASE_URL',
-  defaultValue: 'http://127.0.0.1:8787',
-);
+String get mediaGatewayBaseUrl => AppEnvironment.current.gatewayBaseUrl;
 
 final Provider<MediaUploadRepository> mediaUploadRepositoryProvider =
     Provider<MediaUploadRepository>((Ref ref) {
@@ -33,7 +33,7 @@ final Provider<MediaUploadRepository> mediaUploadRepositoryProvider =
           }
           return token;
         },
-        appCheckToken: () => FirebaseAppCheck.instance.getToken(),
+        appCheckToken: FunctionsBackend.mediaAppCheckToken,
       );
     });
 
@@ -75,9 +75,13 @@ class CloudinaryUploadRepository implements MediaUploadRepository {
     if (!await file.exists()) {
       throw const MediaUploadException('The image file no longer exists.');
     }
-    if (!localPath.toLowerCase().endsWith('.jpg') &&
+    final stampPng = isProcessedStampImage(localPath);
+    if (!stampPng &&
+        !localPath.toLowerCase().endsWith('.jpg') &&
         !localPath.toLowerCase().endsWith('.jpeg')) {
-      throw const MediaUploadException('Only JPEG images can be uploaded.');
+      throw const MediaUploadException(
+        'Only JPEG or processed stamp PNG images can be uploaded.',
+      );
     }
     if (await file.length() > maximumBytes) {
       throw const MediaUploadException('The image must be smaller than 5 MB.');
@@ -86,10 +90,18 @@ class CloudinaryUploadRepository implements MediaUploadRepository {
     try {
       final Map<String, dynamic> signature = await _gatewayRequest(
         '/v1/media/upload-signatures',
-        <String, Object>{'mediaKind': mediaKind},
+        <String, Object>{
+          'mediaKind': mediaKind,
+          if (stampPng) 'imageFormat': 'stamp_png_v1',
+        },
         failureMessage: 'Upload authorization failed.',
       );
       final Uri uploadUrl = Uri.parse(_requiredString(signature, 'uploadUrl'));
+      if (uploadUrl.scheme != 'https' ||
+          uploadUrl.host != 'api.cloudinary.com' ||
+          uploadUrl.userInfo.isNotEmpty) {
+        throw const MediaUploadException('Invalid upload destination.');
+      }
       final String apiKey = _requiredString(signature, 'apiKey');
       final Object? rawParameters = signature['parameters'];
       if (rawParameters is! Map<String, dynamic>) {
@@ -100,7 +112,13 @@ class CloudinaryUploadRepository implements MediaUploadRepository {
 
       final http.MultipartRequest request =
           http.MultipartRequest('POST', uploadUrl)
-            ..files.add(await http.MultipartFile.fromPath('file', localPath))
+            ..files.add(
+              await http.MultipartFile.fromPath(
+                'file',
+                localPath,
+                contentType: MediaType('image', stampPng ? 'png' : 'jpeg'),
+              ),
+            )
             ..fields['api_key'] = apiKey;
       rawParameters.forEach(
         (key, value) => request.fields[key] = value.toString(),
@@ -108,10 +126,19 @@ class CloudinaryUploadRepository implements MediaUploadRepository {
       final String expectedPublicId =
           '${_requiredString(rawParameters, 'folder')}/'
           '${_requiredString(rawParameters, 'public_id')}';
+      if (stampPng &&
+          (rawParameters['format'] != 'png' ||
+              !isProcessedStampImage(expectedPublicId))) {
+        throw const MediaUploadException(
+          'The gateway must support stamp PNG uploads.',
+        );
+      }
       final http.StreamedResponse uploadResponse = await _client
           .send(request)
           .timeout(timeout);
-      final String responseBody = await uploadResponse.stream.bytesToString();
+      final String responseBody = await uploadResponse.stream
+          .bytesToString()
+          .timeout(timeout);
       if (uploadResponse.statusCode < 200 || uploadResponse.statusCode >= 300) {
         throw MediaUploadException(
           'Cloudinary upload failed (${uploadResponse.statusCode}).',
@@ -122,6 +149,12 @@ class CloudinaryUploadRepository implements MediaUploadRepository {
       if (result['resource_type'] != 'image' || publicId != expectedPublicId) {
         throw const MediaUploadException(
           'Cloudinary returned an invalid image identifier.',
+        );
+      }
+      if (stampPng &&
+          (result['format'] != 'png' || !isProcessedStampImage(publicId))) {
+        throw const MediaUploadException(
+          'Stamp transparency was not preserved.',
         );
       }
       return publicId;
@@ -142,12 +175,12 @@ class CloudinaryUploadRepository implements MediaUploadRepository {
     required String failureMessage,
   }) async {
     try {
-      final String? appCheck = await appCheckToken();
+      final String? appCheck = await appCheckToken().timeout(timeout);
       final http.Response response = await _client
           .post(
             Uri.parse('$gatewayBaseUrl$path'),
             headers: <String, String>{
-              'Authorization': 'Bearer ${await authToken()}',
+              'Authorization': 'Bearer ${await authToken().timeout(timeout)}',
               'Content-Type': 'application/json',
               if (appCheck != null && appCheck.isNotEmpty)
                 'X-Firebase-App-Check': appCheck,
@@ -190,11 +223,11 @@ class DemoMediaUploadRepository implements MediaUploadRepository {
 
   @override
   Future<String> uploadStamp(String localPath) async =>
-      'inkstamp/current-user/stamp/${_uuid.v4()}';
+      'inkstamp/current-user/stamp/${_uuid.v4()}${isProcessedStampImage(localPath) ? stampImageSuffix : ''}';
 
   @override
   Future<String> uploadThumbnail(String localPath) async =>
-      'inkstamp/current-user/thumbnail/${_uuid.v4()}';
+      'inkstamp/current-user/thumbnail/${_uuid.v4()}${isProcessedStampImage(localPath) ? stampImageSuffix : ''}';
 
   @override
   Future<void> delete(String publicId) async {}

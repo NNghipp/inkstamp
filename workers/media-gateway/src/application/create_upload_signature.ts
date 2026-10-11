@@ -31,16 +31,20 @@ export class CreateUploadSignature {
   async execute({
     userId,
     mediaKind,
+    imageFormat,
   }: {
     userId: string;
     mediaKind: MediaKind;
+    imageFormat?: "stamp_png_v1";
   }): Promise<UploadSignature> {
     const timestamp = this.now();
     const parameters: CloudinarySignatureParameters = {
       folder: `inkstamp/${userId}`,
-      public_id: `${mediaKind}/${this.newId()}`,
+      public_id: `${mediaKind}/${this.newId()}${imageFormat ? "_stamp_v1" : ""}`,
+      ...(imageFormat ? { format: "png" } : {}),
       timestamp: timestamp.toString(),
       upload_preset: this.configuration.uploadPreset,
+      type: "authenticated",
     };
 
     const signature = await createCloudinarySignature({
@@ -54,7 +58,7 @@ export class CreateUploadSignature {
       parameters: { ...parameters, signature },
       uploadUrl:
         `https://api.cloudinary.com/v1_1/${this.configuration.cloudName}` +
-        "/image/authenticated",
+        "/image/upload",
     };
   }
 }

@@ -9,8 +9,10 @@ reply with another stamp. Sent and received stamps are retained in a calendar.
 
 ## MVP
 
-- Flutter application for iOS and Android.
-- Apple/Google authentication and unique usernames.
+- Flutter application delivered Android-first; iOS is deferred until Android
+  is feature-complete.
+- Google authentication and unique usernames on Android. Apple authentication
+  is part of the deferred iOS phase.
 - Friend requests through username, QR and invite links.
 - Camera-only capture, square crop, four stamp edges and six paper tones.
 - All Friends, Close Friends and Select People audiences.
@@ -112,13 +114,14 @@ deployed until App Check, rate limiting and private delivery are complete.
 - `flutter test --coverage`
 - TypeScript lint, tests and build.
 - Firebase Rules emulator tests.
-- Android and iOS debug builds in CI.
+- Android debug builds in CI. Add iOS build gates when iOS work begins.
 - Domain/use-case target coverage: 90%.
 - Data/backend service target coverage: 80%.
 
 ## Delivery
 
-The baseline schedule is 16 weeks for one developer. Native background widget
-refresh, signing, store credentials and production Firebase configuration are
-external prerequisites. Closed beta targets 50–200 users and a maximum of 50
-friends per account.
+The baseline Android schedule is 16 weeks for one developer. Native background
+widget refresh, signing, store credentials and production Firebase configuration
+are external prerequisites. Closed beta targets 50–200 users and a maximum of
+50 friends per account. iOS implementation and QA are estimated separately only
+after the Android application is complete.

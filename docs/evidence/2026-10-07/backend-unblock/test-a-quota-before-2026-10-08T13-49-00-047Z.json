@@ -1,0 +1,23 @@
+{
+  "recordedAt": "2026-10-08T13:49:00.047Z",
+  "projectId": "inkstamp-dev",
+  "prior": {
+    "name": "projects/inkstamp-dev/databases/(default)/documents/users/uC6PwltoIQSZ9L54aXDufCxPRLX2/dailyQuotas/2026-10-08_friendRequests",
+    "fields": {
+      "updatedAt": {
+        "timestampValue": "2026-10-08T13:43:02.932Z"
+      },
+      "action": {
+        "stringValue": "friendRequests"
+      },
+      "consumedKeys": {
+        "arrayValue": {}
+      },
+      "count": {
+        "integerValue": "19"
+      }
+    },
+    "createTime": "2026-10-08T12:46:41.002916Z",
+    "updateTime": "2026-10-08T13:43:02.947029Z"
+  }
+}

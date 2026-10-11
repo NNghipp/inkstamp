@@ -14,7 +14,7 @@ actual Jira project key during synchronization.
 | `INK-LOCAL-004` | Bug | High | Fixed | Media gateway used the generic upload endpoint for authenticated assets |
 | `INK-LOCAL-005` | Security | Highest | Fixed | Media gateway verifies Firebase App Check tokens |
 | `INK-LOCAL-006` | Security | High | Open | Media gateway has no distributed rate limiting |
-| `INK-LOCAL-007` | Task | High | In Progress | Android device verification is incomplete |
+| `INK-LOCAL-007` | Task | High | Done | Android emulator E2E verification completed |
 | `INK-LOCAL-008` | Maintenance | Medium | Open | Firebase plugins still apply the legacy Kotlin Gradle Plugin |
 | `INK-LOCAL-009` | Security | Medium | Fixed | Firebase Functions resolved a vulnerable transitive uuid version |
 
@@ -70,7 +70,9 @@ because Worker isolates are reused and not globally consistent.
 
 Firebase project/app registration, Android SHA fingerprints, Google provider,
 and Android/Web OAuth clients are configured. The refreshed ignored
-`google-services.json` builds successfully. Android device verification remains.
+`google-services.json` builds successfully. The project owner accepted Android
+emulator E2E as sufficient evidence and confirmed the complete flow passes;
+physical-device verification is not required for this milestone.
 
 ### `INK-LOCAL-008`
 

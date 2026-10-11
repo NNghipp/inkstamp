@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:inkstamp/app/router/app_routes.dart';
@@ -12,14 +13,21 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  Timer? _navigation;
   @override
   void initState() {
     super.initState();
-    Future<void>.delayed(const Duration(milliseconds: 850), () {
+    _navigation = Timer(const Duration(milliseconds: 850), () {
       if (mounted) {
         context.go(AppRoutes.welcome);
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _navigation?.cancel();
+    super.dispose();
   }
 
   @override

@@ -34,6 +34,7 @@ class Stamp {
     this.isSeen = false,
     this.cloudinaryPublicId,
     this.cloudinaryThumbnailPublicId,
+    this.caption,
   });
 
   final String id;
@@ -49,6 +50,15 @@ class Stamp {
   final bool isSeen;
   final String? cloudinaryPublicId;
   final String? cloudinaryThumbnailPublicId;
+  final String? caption;
+
+  String get shortTitle {
+    final text = caption?.trim() ?? '';
+    final characters = text.runes.toList();
+    return characters.length <= 28
+        ? text
+        : '${String.fromCharCodes(characters.take(27))}…';
+  }
 
   Stamp copyWith({
     ReactionType? reaction,
@@ -72,6 +82,7 @@ class Stamp {
       cloudinaryPublicId: cloudinaryPublicId ?? this.cloudinaryPublicId,
       cloudinaryThumbnailPublicId:
           cloudinaryThumbnailPublicId ?? this.cloudinaryThumbnailPublicId,
+      caption: caption,
     );
   }
 }

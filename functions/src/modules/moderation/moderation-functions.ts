@@ -15,10 +15,10 @@ import {
 } from "../../shared/validation/schemas.js";
 
 export const reportContent = onCall(
-  { region, enforceAppCheck: true },
+  { region, enforceAppCheck },
   async (request) => {
     try {
-      const reporterId = requireAuth(request);
+      const reporterId = await requireAuth(request);
       const input = reportContentSchema.parse(request.data);
       await consumeDailyQuota(reporterId, "reports", maxDailyReports);
       const delivery = await firestore
@@ -51,10 +51,10 @@ export const reportContent = onCall(
 );
 
 export const blockUser = onCall(
-  { region, enforceAppCheck: true },
+  { region, enforceAppCheck },
   async (request) => {
     try {
-      const userId = requireAuth(request);
+      const userId = await requireAuth(request);
       const input = userIdSchema.parse(request.data);
       if (input.userId === userId) {
         throw new HttpsError(
@@ -63,20 +63,43 @@ export const blockUser = onCall(
         );
       }
       const pairId = friendshipId(userId, input.userId);
-      const batch = firestore.batch();
-      batch.set(firestore.doc(`friendships/${pairId}`), {
-        members: [userId, input.userId].sort(),
-        status: "blocked",
-        blockedBy: userId,
-        updatedAt: FieldValue.serverTimestamp(),
-      });
-      batch.delete(
+      const [userProfile, targetProfile] = await Promise.all([
+        firestore.doc(`users/${userId}`).get(),
+        firestore.doc(`users/${input.userId}`).get(),
+      ]);
+      await firestore.runTransaction(async (transaction) => {
+        const reference = firestore.doc(`friendships/${pairId}`);
+        const current = await transaction.get(reference);
+        if (current.get("status") === "blocked" && current.get("blockedBy") !== userId) {
+          throw new HttpsError("permission-denied", "This connection is already unavailable.");
+        }
+        transaction.set(
+        reference,
+        {
+          members: [userId, input.userId].sort(),
+          status: "blocked",
+          blockedBy: userId,
+          memberProfiles: {
+            [userId]: {
+              username: userProfile.get("username") as string,
+              displayName: userProfile.get("displayName") as string,
+            },
+            [input.userId]: {
+              username: targetProfile.get("username") as string,
+              displayName: targetProfile.get("displayName") as string,
+            },
+          },
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+      transaction.delete(
         firestore.doc(`users/${userId}/closeFriends/${input.userId}`),
       );
-      batch.delete(
+      transaction.delete(
         firestore.doc(`users/${input.userId}/closeFriends/${userId}`),
       );
-      await batch.commit();
+      });
 
       await revokeDeliveries(userId, input.userId);
       await revokeDeliveries(input.userId, userId);
@@ -88,22 +111,19 @@ export const blockUser = onCall(
 );
 
 export const unblockUser = onCall(
-  { region, enforceAppCheck: true },
+  { region, enforceAppCheck },
   async (request) => {
     try {
-      const userId = requireAuth(request);
+      const userId = await requireAuth(request);
       const input = userIdSchema.parse(request.data);
       const reference = firestore.doc(
         `friendships/${friendshipId(userId, input.userId)}`,
       );
-      const snapshot = await reference.get();
-      if (
-        snapshot.exists &&
-        snapshot.get("status") === "blocked" &&
-        snapshot.get("blockedBy") === userId
-      ) {
-        await reference.delete();
-      }
+      await firestore.runTransaction(async (transaction) => {
+        const snapshot = await transaction.get(reference);
+        if (snapshot.exists && snapshot.get("status") === "blocked" &&
+            snapshot.get("blockedBy") === userId) transaction.delete(reference);
+      });
       return { unblocked: true };
     } catch (error) {
       throw toHttpsError(error);
@@ -135,3 +155,4 @@ async function revokeDeliveries(
     await batch.commit();
   }
 }
+import { enforceAppCheck } from "../../config/callable-security.js";

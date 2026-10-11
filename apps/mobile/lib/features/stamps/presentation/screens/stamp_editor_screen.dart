@@ -7,6 +7,7 @@ import 'package:inkstamp/app/theme/app_spacing.dart';
 import 'package:inkstamp/core/widgets/inkstamp_button.dart';
 import 'package:inkstamp/core/widgets/inkstamp_scaffold.dart';
 import 'package:inkstamp/core/widgets/stamp_artwork.dart';
+import 'package:inkstamp/features/authentication/presentation/controllers/session_controller.dart';
 import 'package:inkstamp/features/stamps/domain/entities/stamp.dart';
 import 'package:inkstamp/features/stamps/domain/entities/stamp_draft.dart';
 import 'package:inkstamp/features/stamps/presentation/controllers/stamp_composer_controller.dart';
@@ -20,6 +21,9 @@ class StampEditorScreen extends ConsumerWidget {
     final StampComposerController controller = ref.read(
       stampComposerControllerProvider.notifier,
     );
+    final bool firebaseReady = ref.watch(firebaseInitializedProvider);
+    final bool imageReady =
+        draft.localImagePath != null && draft.localThumbnailPath != null;
 
     return InkstampScaffold(
       title: 'Create stamp',
@@ -35,6 +39,7 @@ class StampEditorScreen extends ConsumerWidget {
                   seed: draft.seed,
                   frameStyle: draft.frameStyle,
                   paperTone: draft.paperTone,
+                  localImagePath: draft.localImagePath,
                 ),
               ),
             ),
@@ -102,13 +107,15 @@ class StampEditorScreen extends ConsumerWidget {
                 ? 'Choose recipients'
                 : 'Reply with a stamp',
             icon: Icons.arrow_forward_rounded,
-            onPressed: () {
-              context.push(
-                draft.replyToStampId == null
-                    ? AppRoutes.cameraAudience
-                    : AppRoutes.cameraSending,
-              );
-            },
+            onPressed: !firebaseReady || imageReady
+                ? () {
+                    context.push(
+                      draft.replyToStampId == null
+                          ? AppRoutes.cameraAudience
+                          : AppRoutes.cameraSending,
+                    );
+                  }
+                : null,
           ),
           const SizedBox(height: AppSpacing.lg),
         ],

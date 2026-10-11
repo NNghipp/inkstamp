@@ -10,11 +10,11 @@ import { reserveUsernameSchema } from "../../shared/validation/schemas.js";
 export const reserveUsername = onCall(
   {
     region,
-    enforceAppCheck: true,
+    enforceAppCheck,
   },
   async (request) => {
     try {
-      const userId = requireAuth(request);
+      const userId = await requireAuth(request);
       const input = reserveUsernameSchema.parse(request.data);
       const username = normalizeUsername(input.username);
       const usernameReference = firestore.doc(`usernames/${username}`);
@@ -69,3 +69,4 @@ export const reserveUsername = onCall(
     }
   },
 );
+import { enforceAppCheck } from "../../config/callable-security.js";

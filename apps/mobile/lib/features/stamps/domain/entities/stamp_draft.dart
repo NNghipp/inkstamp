@@ -44,6 +44,7 @@ class StampDraft {
     bool clearReply = false,
     String? localImagePath,
     String? localThumbnailPath,
+    bool clearLocalImages = false,
     String? cloudinaryPublicId,
     String? cloudinaryThumbnailPublicId,
   }) {
@@ -54,8 +55,12 @@ class StampDraft {
       audience: audience ?? this.audience,
       selectedRecipientIds: selectedRecipientIds ?? this.selectedRecipientIds,
       replyToStampId: clearReply ? null : replyToStampId ?? this.replyToStampId,
-      localImagePath: localImagePath ?? this.localImagePath,
-      localThumbnailPath: localThumbnailPath ?? this.localThumbnailPath,
+      localImagePath: clearLocalImages
+          ? null
+          : localImagePath ?? this.localImagePath,
+      localThumbnailPath: clearLocalImages
+          ? null
+          : localThumbnailPath ?? this.localThumbnailPath,
       cloudinaryPublicId: cloudinaryPublicId ?? this.cloudinaryPublicId,
       cloudinaryThumbnailPublicId:
           cloudinaryThumbnailPublicId ?? this.cloudinaryThumbnailPublicId,

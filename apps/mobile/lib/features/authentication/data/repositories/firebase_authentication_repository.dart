@@ -2,6 +2,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:inkstamp/core/config/functions_backend.dart';
+import 'package:inkstamp/features/authentication/data/repositories/current_auth_profiles.dart';
+import 'package:inkstamp/features/authentication/domain/dev_auth_policy.dart';
 import 'package:inkstamp/features/authentication/domain/entities/app_user.dart';
 import 'package:inkstamp/features/authentication/domain/repositories/authentication_repository.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
@@ -13,12 +16,36 @@ class FirebaseAuthenticationRepository implements AuthenticationRepository {
     FirebaseFunctions? functions,
   }) : _auth = auth ?? FirebaseAuth.instance,
        _firestore = firestore ?? FirebaseFirestore.instance,
-       _functions = functions ?? FirebaseFunctions.instance;
+       _functions = functions ?? FunctionsBackend.create();
 
   final FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
   final FirebaseFunctions _functions;
   Future<void>? _googleInitialization;
+
+  @override
+  Future<AppUser> signInForDevelopment({
+    required String email,
+    required String password,
+  }) async {
+    // Not injectable: bypassing the UI cannot enable test auth in release.
+    if (!DevAuthPolicy.compiledEnabled) {
+      throw StateError('DEV test authentication is unavailable.');
+    }
+    DevAuthPolicy.current.requireAllowed(
+      projectId: _auth.app.options.projectId,
+      email: email,
+    );
+    try {
+      final credential = await _auth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      return await _userFromFirebase(credential.user);
+    } on FirebaseAuthException catch (error) {
+      throw _mapFirebaseAuthException(error);
+    }
+  }
 
   // ---------------------------------------------------------------------------
   // Sign-in
@@ -28,7 +55,10 @@ class FirebaseAuthenticationRepository implements AuthenticationRepository {
   Future<AppUser> signInWithGoogle() async {
     try {
       final GoogleSignIn googleSignIn = GoogleSignIn.instance;
-      _googleInitialization ??= googleSignIn.initialize();
+      const serverClientId = String.fromEnvironment('GOOGLE_SERVER_CLIENT_ID');
+      _googleInitialization ??= googleSignIn.initialize(
+        serverClientId: serverClientId.isEmpty ? null : serverClientId,
+      );
       await _googleInitialization;
       final GoogleSignInAccount googleUser = await googleSignIn.authenticate();
       final GoogleSignInAuthentication googleAuth = googleUser.authentication;
@@ -144,8 +174,13 @@ class FirebaseAuthenticationRepository implements AuthenticationRepository {
 
   @override
   Future<void> signOut() async {
+    final usedGoogle =
+        _auth.currentUser?.providerData.any(
+          (provider) => provider.providerId == 'google.com',
+        ) ??
+        false;
     await _auth.signOut();
-    await GoogleSignIn.instance.signOut();
+    if (usedGoogle) await GoogleSignIn.instance.signOut();
   }
 
   @override
@@ -160,12 +195,11 @@ class FirebaseAuthenticationRepository implements AuthenticationRepository {
   /// A convenience stream exposing Firebase Auth state changes as [AppUser?].
   @override
   Stream<AppUser?> authStateChanges() {
-    return _auth.authStateChanges().asyncMap((User? firebaseUser) async {
-      if (firebaseUser == null) {
-        return null;
-      }
-      return _loadUserProfile(firebaseUser.uid);
-    });
+    return currentAuthProfiles(
+      authUids: _auth.authStateChanges().map((user) => user?.uid),
+      currentUid: () => _auth.currentUser?.uid,
+      loadProfile: _loadUserProfile,
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -182,7 +216,8 @@ class FirebaseAuthenticationRepository implements AuthenticationRepository {
   Future<AppUser> _loadUserProfile(String uid) async {
     final DocumentSnapshot<Map<String, dynamic>> snapshot = await _firestore
         .doc('users/$uid')
-        .get();
+        .get()
+        .timeout(const Duration(seconds: 20));
 
     if (snapshot.exists) {
       final Map<String, dynamic> data = snapshot.data()!;

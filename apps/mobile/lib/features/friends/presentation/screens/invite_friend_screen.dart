@@ -1,17 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:inkstamp/app/theme/app_colors.dart';
 import 'package:inkstamp/app/theme/app_spacing.dart';
 import 'package:inkstamp/core/widgets/inkstamp_button.dart';
 import 'package:inkstamp/core/widgets/inkstamp_scaffold.dart';
+import 'package:inkstamp/features/authentication/presentation/controllers/session_controller.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
-class InviteFriendScreen extends StatelessWidget {
+String inviteLinkForUsername(String username) {
+  return 'https://inkstamp.app/u/${Uri.encodeComponent(username)}';
+}
+
+class InviteFriendScreen extends ConsumerWidget {
   const InviteFriendScreen({super.key});
 
-  static const String inviteLink = 'https://inkstamp.app/u/minhanh.stamps';
-
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final String username =
+        ref.watch(sessionControllerProvider).user?.username ?? '';
+    final String inviteLink = inviteLinkForUsername(username);
     return InkstampScaffold(
       title: 'Invite friends',
       body: Column(
@@ -31,14 +39,16 @@ class InviteFriendScreen extends StatelessWidget {
                 ),
               ],
             ),
-            child: const AspectRatio(
+            child: AspectRatio(
               aspectRatio: 1,
-              child: CustomPaint(painter: _QrPlaceholderPainter()),
+              child: username.isEmpty
+                  ? const Center(child: CircularProgressIndicator())
+                  : QrImageView(data: inviteLink),
             ),
           ),
           const SizedBox(height: AppSpacing.xl),
           Text(
-            '@minhanh.stamps',
+            username.isEmpty ? 'Your profile' : '@$username',
             style: Theme.of(context).textTheme.headlineLarge,
           ),
           const SizedBox(height: AppSpacing.xs),
@@ -51,7 +61,7 @@ class InviteFriendScreen extends StatelessWidget {
             label: 'Copy invite link',
             icon: Icons.link_rounded,
             onPressed: () async {
-              await Clipboard.setData(const ClipboardData(text: inviteLink));
+              await Clipboard.setData(ClipboardData(text: inviteLink));
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Invite link copied.')),
@@ -64,46 +74,4 @@ class InviteFriendScreen extends StatelessWidget {
       ),
     );
   }
-}
-
-class _QrPlaceholderPainter extends CustomPainter {
-  const _QrPlaceholderPainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final Paint paint = Paint()..color = AppColors.ink;
-    const List<List<int>> modules = <List<int>>[
-      <int>[1, 1, 1, 0, 1, 0, 1, 1, 1],
-      <int>[1, 0, 1, 0, 0, 1, 1, 0, 1],
-      <int>[1, 1, 1, 1, 0, 1, 1, 1, 1],
-      <int>[0, 0, 1, 0, 1, 0, 0, 1, 0],
-      <int>[1, 1, 0, 1, 1, 1, 0, 1, 1],
-      <int>[0, 1, 1, 0, 1, 0, 1, 0, 0],
-      <int>[1, 1, 1, 0, 0, 1, 1, 1, 1],
-      <int>[1, 0, 1, 1, 1, 0, 1, 0, 1],
-      <int>[1, 1, 1, 0, 1, 1, 1, 1, 1],
-    ];
-    final double cell = size.width / modules.length;
-    for (int row = 0; row < modules.length; row += 1) {
-      for (int column = 0; column < modules[row].length; column += 1) {
-        if (modules[row][column] == 1) {
-          canvas.drawRRect(
-            RRect.fromRectAndRadius(
-              Rect.fromLTWH(
-                column * cell + 2,
-                row * cell + 2,
-                cell - 4,
-                cell - 4,
-              ),
-              const Radius.circular(2),
-            ),
-            paint,
-          );
-        }
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

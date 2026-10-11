@@ -1,0 +1,13 @@
+2026-10-11T10:48:25.917Z
+√ Built build\app\outputs\flutter-apk\app-debug.apk
+00:00 +0: real DEV backend photo presentation
+The following TestFailure was thrown running a test:
+Expected: <200>
+  Actual: <400>
+  real DEV backend photo presentation
+01:33 +0 -1: real DEV backend photo presentation [E]
+  Test failed. See exception logs above.
+  The test description was: real DEV backend photo presentation
+01:34 +0 -1: Some tests failed.
+  D:/stampcard/apps/mobile/integration_test/photo_presentation_test.dart: real DEV backend photo presentation
+BACKEND_E2E_EXIT=1

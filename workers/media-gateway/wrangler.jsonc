@@ -2,7 +2,7 @@
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "inkstamp-media-gateway",
   "main": "src/presentation/worker.ts",
-  "compatibility_date": "2026-09-09",
+  "compatibility_date": "2026-08-27",
   "compatibility_flags": ["nodejs_compat"],
   "observability": {
     "enabled": true,
@@ -10,5 +10,18 @@
   },
   "vars": {
     "FIREBASE_PROJECT_ID": "inkstamp-dev"
+  },
+  "env": {
+    "production": {
+      "name": "inkstamp-media-gateway-production",
+      "workers_dev": false,
+      "vars": {
+        "APP_ENV": "prod",
+        "FIREBASE_PROJECT_ID": "",
+        "FIREBASE_PROJECT_NUMBER": "",
+        "APP_CHECK_ENFORCED": "true",
+        "RATE_LIMIT_ENFORCED": "true"
+      }
+    }
   }
 }

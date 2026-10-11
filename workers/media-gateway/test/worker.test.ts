@@ -24,6 +24,31 @@ function dependencies(overrides: Partial<WorkerDependencies> = {}): WorkerDepend
 }
 
 describe("media gateway", () => {
+  it("accepts only the supported opt-in stamp PNG format", async () => {
+    for (const imageFormat of ["stamp_png_v1", "jpg", "webp", null]) {
+      const request = new Request("https://host/v1/media/upload-signatures", {
+        method: "POST", headers: { Authorization: "Bearer token", "Content-Type": "application/json" },
+        body: JSON.stringify({ mediaKind: "stamp", imageFormat }) });
+      const response = await handleRequest(request, environment, dependencies());
+      expect(response.status).toBe(imageFormat === "stamp_png_v1" ? 200 : 400);
+    }
+  });
+  it("fails closed for unconfigured production and mixed DEV project", async () => {
+    const invalid = { ...environment, APP_ENV: "prod" };
+    expect((await handleRequest(uploadRequest(), invalid, dependencies())).status).toBe(503);
+    expect((await handleRequest(uploadRequest(), { ...invalid,
+      APP_CHECK_ENFORCED: "true", RATE_LIMIT_ENFORCED: "true", FIREBASE_PROJECT_NUMBER: "123" },
+      dependencies())).status).toBe(503);
+  });
+
+  it("does not return sensitive upstream App Check exceptions", async () => {
+    const response = await handleRequest(uploadRequest(), { ...environment, APP_CHECK_ENFORCED: "true" },
+      dependencies({ appCheckVerifier: { async verify() {
+        throw new InvalidAppCheckError("Bearer private-token https://private/image");
+      } } }));
+    expect(response.status).toBe(403);
+    expect(await response.text()).not.toContain("private");
+  });
   it("reports health only when configuration is complete", async () => {
     expect((await handleRequest(new Request("https://host/health"), environment, dependencies())).status).toBe(200);
     const invalid = await handleRequest(new Request("https://host/health"), { ...environment, CLOUDINARY_API_SECRET: "" }, dependencies());
@@ -35,7 +60,7 @@ describe("media gateway", () => {
     const response = await handleRequest(uploadRequest(), environment, dependencies());
     const body = await response.json<Record<string, unknown>>();
     expect(response.status).toBe(200);
-    expect(body.uploadUrl).toBe("https://api.cloudinary.com/v1_1/inkstamp/image/authenticated");
+    expect(body.uploadUrl).toBe("https://api.cloudinary.com/v1_1/inkstamp/image/upload");
     expect(JSON.stringify(body)).not.toContain("private-secret");
   });
 

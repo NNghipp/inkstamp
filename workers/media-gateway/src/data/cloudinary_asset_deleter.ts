@@ -34,7 +34,7 @@ export class CloudinaryAssetDeleter implements AssetDeleter {
     });
     const response = await fetch(
       `https://api.cloudinary.com/v1_1/${input.cloudName}/image/destroy`,
-      { method: "POST", body },
+      { method: "POST", body, signal: AbortSignal.timeout(12000) },
     );
     if (!response.ok) throw new Error("Cloudinary asset deletion failed.");
     const result = await response.json<{ result?: string }>();

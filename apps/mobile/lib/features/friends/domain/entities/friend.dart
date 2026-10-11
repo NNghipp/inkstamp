@@ -1,4 +1,4 @@
-enum FriendStatus { pending, accepted, blocked }
+enum FriendStatus { none, pending, accepted, blocked }
 
 class InkstampFriend {
   const InkstampFriend({
@@ -7,6 +7,7 @@ class InkstampFriend {
     required this.displayName,
     required this.status,
     this.isCloseFriend = false,
+    this.isIncomingRequest = false,
   });
 
   final String id;
@@ -14,14 +15,20 @@ class InkstampFriend {
   final String displayName;
   final FriendStatus status;
   final bool isCloseFriend;
+  final bool isIncomingRequest;
 
-  InkstampFriend copyWith({FriendStatus? status, bool? isCloseFriend}) {
+  InkstampFriend copyWith({
+    FriendStatus? status,
+    bool? isCloseFriend,
+    bool? isIncomingRequest,
+  }) {
     return InkstampFriend(
       id: id,
       username: username,
       displayName: displayName,
       status: status ?? this.status,
       isCloseFriend: isCloseFriend ?? this.isCloseFriend,
+      isIncomingRequest: isIncomingRequest ?? this.isIncomingRequest,
     );
   }
 }

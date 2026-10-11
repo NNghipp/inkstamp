@@ -22,6 +22,7 @@ export async function generateDeliveryUrl({
     public_id: publicId,
     timestamp: timestamp.toString(),
     type: "authenticated",
+    ...(publicId.endsWith("_stamp_v1") ? { format: "png" } : {}),
   };
   const signature = await createCloudinarySignature({
     parameters,

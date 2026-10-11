@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><meta content="mobile_tab" name="shell-type"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{width:100vw;margin:0;padding:0;}body{overscroll-behavior:none;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}}::-webkit-scrollbar{display:none;}
+/* Stamp perforated teeth border effect */
+.stamp-border {
+  position: relative;
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.85), 0 20px 45px rgba(0, 0, 0, 0.35);
+}
+.stamp-teeth-overlay {
+  background: 
+    radial-gradient(circle at 0px 50%, transparent 4px, white 4.5px) left / 10px 14px repeat-y,
+    radial-gradient(circle at 100% 50%, transparent 4px, white 4.5px) right / 10px 14px repeat-y,
+    radial-gradient(circle at 50% 0px, transparent 4px, white 4.5px) top / 14px 10px repeat-x,
+    radial-gradient(circle at 50% 100%, transparent 4px, white 4.5px) bottom / 14px 10px repeat-x;
+}
+.mini-stamp-teeth {
+  background: 
+    radial-gradient(circle at 0px 50%, #000 2px, transparent 2.5px) left / 6px 8px repeat-y,
+    radial-gradient(circle at 100% 50%, #000 2px, transparent 2.5px) right / 6px 8px repeat-y,
+    radial-gradient(circle at 50% 0px, #000 2px, transparent 2.5px) top / 8px 6px repeat-x,
+    radial-gradient(circle at 50% 100%, #000 2px, transparent 2.5px) bottom / 8px 6px repeat-x;
+}
+</style><script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "surface-variant": "#e2e3e0", "inverse-surface": "#2f312f", "surface-container": "#eeeeeb", "background": "#f9f9f6", "on-background": "#1a1c1b", "surface-container-low": "#f4f4f1", "surface-container-lowest": "#ffffff", "surface-dim": "#dadad7", "tertiary-fixed-dim": "#cbc6bf", "on-secondary-fixed-variant": "#554335", "primary": "#020302", "on-error-container": "#93000a", "secondary-container": "#f9ddca", "error-container": "#ffdad6", "on-surface": "#1a1c1b", "outline": "#777771", "tertiary-fixed": "#e8e2da", "on-secondary-fixed": "#27190d", "tertiary-container": "#1f1d19", "primary-fixed": "#e5e2de", "on-error": "#ffffff", "on-tertiary-fixed-variant": "#494641", "on-surface-variant": "#464741", "secondary": "#6e5a4b", "inverse-primary": "#c8c6c3", "outline-variant": "#c7c7bf", "on-primary-fixed-variant": "#474744", "on-secondary": "#ffffff", "surface-tint": "#5f5e5c", "primary-container": "#1d1d1b", "surface": "#f9f9f6", "error": "#ba1a1a", "on-primary-container": "#868582", "inverse-on-surface": "#f1f1ee", "surface-container-high": "#e8e8e5", "tertiary": "#040301", "primary-fixed-dim": "#c8c6c3", "surface-bright": "#f9f9f6", "on-tertiary": "#ffffff", "secondary-fixed-dim": "#dcc2af", "surface-container-highest": "#e2e3e0", "on-tertiary-fixed": "#1d1b17", "secondary-fixed": "#f9ddca", "on-primary": "#ffffff", "on-tertiary-container": "#89847e", "on-secondary-container": "#756051", "on-primary-fixed": "#1c1c1a" }, "borderRadius": { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, "spacing": { "space-xl": "2.5rem", "space-xxl": "4rem", "margin": "1.25rem", "space-xs": "0.25rem", "space-sm": "0.5rem", "margin-desktop": "4rem", "gutter": "1rem", "gutter-tablet": "1.5rem", "margin-tablet": "2.5rem", "gutter-desktop": "2.5rem", "space-lg": "1.5rem", "space-md": "1rem" }, "fontFamily": { "headline-sm": ["Be Vietnam Pro"], "label-md": ["Be Vietnam Pro"], "body-lg": ["Be Vietnam Pro"], "headline-md": ["Be Vietnam Pro"], "body-md": ["Be Vietnam Pro"], "label-sm": ["Be Vietnam Pro"], "display-lg-mobile": ["Be Vietnam Pro"], "technical-data": ["Be Vietnam Pro"], "display-lg": ["Be Vietnam Pro"] }, "fontSize": { "headline-sm": ["18px", { "lineHeight": "26px", "letterSpacing": "-0.005em", "fontWeight": "600" }], "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.04em", "fontWeight": "500" }], "body-lg": ["16px", { "lineHeight": "26px", "letterSpacing": "0em", "fontWeight": "400" }], "headline-md": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "500" }], "body-md": ["14px", { "lineHeight": "22px", "letterSpacing": "0.01em", "fontWeight": "400" }], "label-sm": ["11px", { "lineHeight": "14px", "letterSpacing": "0.06em", "fontWeight": "500" }], "display-lg-mobile": ["30px", { "lineHeight": "38px", "letterSpacing": "-0.015em", "fontWeight": "500" }], "technical-data": ["10px", { "lineHeight": "14px", "letterSpacing": "0.08em", "fontWeight": "600" }], "display-lg": ["40px", { "lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "500" }] } } } };</script></head><body class="bg-primary font-body-md text-body-md text-on-surface antialiased overflow-hidden select-none h-screen w-screen relative"><div class="fixed inset-0 z-0 overflow-hidden pointer-events-none">
+<!-- Full Screen Warm Camera Feed -->
+<img alt="Camera Live Feed" class="w-full h-full object-cover transition-transform duration-500 ease-out" id="camera-feed" src="https://lh3.googleusercontent.com/aida/AEtjO1WvkaSHsg5mxQGzei9cSrlHWTw0jMWbnJvmliFmbDv84SeXkH-f4L0DdbjXjeztUCr3AEd6LkG2_3_YWJSF8IgzSQtdY4HNnfDBIDUiaEeOt3MWi6ZCv3diibZlVNO7jgQBv-VCvQLzJxev_Px103HyUV9-4R6xGiaj8R3xADtgbMYDeHXH2ik3D_JOP8lcWwaDyY7MECTWJgZTvW2HctWYAuRSfOjxVILZ2Wf9MMiCLnCOxF6tPf5iJ1U"/>
+<!-- Subtle warm natural camera grading -->
+<div class="absolute inset-0 bg-gradient-to-b from-black/45 via-transparent to-black/60 pointer-events-none"></div>
+</div>
+<!-- Stamp Crop Mask & Dimmed Surrounding Overlay (Vignette Dimming outside stamp) -->
+<div class="fixed inset-0 z-10 flex flex-col items-center justify-center pointer-events-none">
+<!-- SVG Mask providing darkened surround with crisp rectangular cutout matching stamp -->
+<svg class="absolute inset-0 w-full h-full pointer-events-none" preserveaspectratio="none">
+<defs>
+<mask id="stamp-mask">
+<!-- White reveals everything (dim layer) -->
+<rect fill="white" height="100%" width="100%"></rect>
+<!-- Black cuts hole for stamp area (live crop focus) -->
+<rect fill="black" height="56%" rx="2" width="76%" x="12%" y="16%"></rect>
+</mask>
+</defs>
+<!-- 40% Dimmed overlay outside the stamp bounds -->
+<rect fill="rgba(10, 10, 9, 0.45)" height="100%" mask="url(#stamp-mask)" width="100%"></rect>
+</svg>
+<!-- Central Rectangular Postage Stamp Frame (Aspect Ratio ~3:4 / 4:5) -->
+<div class="relative w-[76%] max-w-[340px] aspect-[3.2/4.2] flex flex-col justify-between pointer-events-auto" id="stamp-target" style="margin-top: -3.5rem;">
+<!-- Perforated Scalloped Teeth Outer Boundary -->
+<div class="absolute -inset-2.5 pointer-events-none stamp-border rounded-[2px]">
+<!-- Scalloped SVG Teeth along all 4 edges -->
+<svg class="w-full h-full overflow-visible" preserveaspectratio="none" viewbox="0 0 100 130">
+<!-- Perforated outer decorative line with teeth points -->
+<rect fill="none" height="129" stroke="rgba(255,255,255,0.75)" stroke-dasharray="2.5 2.2" stroke-linecap="round" stroke-width="0.8" width="99" x="0.5" y="0.5"></rect>
+</svg>
+</div>
+<!-- Inner Stamp Framing Border -->
+<div class="absolute inset-0 border border-white/60 pointer-events-none rounded-[1px] shadow-[inset_0_0_12px_rgba(0,0,0,0.15)]"></div>
+<!-- 4 Stamp Corner Tick Anchors -->
+<span class="absolute top-1.5 left-1.5 w-2.5 h-2.5 border-t-[1.5px] border-l-[1.5px] border-white/90 pointer-events-none"></span>
+<span class="absolute top-1.5 right-1.5 w-2.5 h-2.5 border-t-[1.5px] border-r-[1.5px] border-white/90 pointer-events-none"></span>
+<span class="absolute bottom-1.5 left-1.5 w-2.5 h-2.5 border-b-[1.5px] border-l-[1.5px] border-white/90 pointer-events-none"></span>
+<span class="absolute bottom-1.5 right-1.5 w-2.5 h-2.5 border-b-[1.5px] border-r-[1.5px] border-white/90 pointer-events-none"></span>
+<!-- Interactive Tap-to-Focus Reticle indicator -->
+<div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 pointer-events-none transition-all duration-200" id="focus-reticle">
+<div class="w-12 h-12 rounded-full border border-white/80 flex items-center justify-center">
+<span class="w-1.5 h-1.5 rounded-full bg-white shadow-sm"></span>
+</div>
+</div>
+<!-- Top Stamp Header inside frame: Stamp Active badge -->
+<div class="relative z-20 pt-3 px-3 flex items-center justify-between">
+<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/45 backdrop-blur-md border border-white/20 shadow-sm">
+<span class="w-1.5 h-1.5 rounded-full bg-[#f59e0b] shadow-[0_0_6px_#f59e0b] animate-pulse"></span>
+<span class="font-technical-data text-[9px] tracking-[0.2em] font-semibold text-white uppercase">STAMP ACTIVE</span>
+</div>
+<span class="font-technical-data text-[9px] tracking-wider text-white/70 uppercase">CROP 3:4</span>
+</div>
+<!-- Bottom Stamp Technical Metadata in Sans Serif -->
+<div class="relative z-20 pb-2.5 px-3 flex items-center justify-between pointer-events-none">
+<span class="font-technical-data text-[9px] tracking-[0.18em] uppercase text-white/90 drop-shadow-sm font-medium">INKSTAMP · VN-026</span>
+<span class="font-technical-data text-[9px] tracking-[0.16em] uppercase text-white/80 drop-shadow-sm">35MM · N° 0142</span>
+</div>
+</div>
+</div>
+<!-- Header overlay: Clean transparent minimal bar -->
+<header class="fixed top-0 inset-x-0 z-40 pt-safe">
+<div class="h-14 px-margin flex items-center justify-between">
+<!-- Title: INKSTAMP / máy ảnh -->
+<div class="flex items-center gap-1.5 py-1 px-3 rounded-full bg-black/25 backdrop-blur-md border border-white/10">
+<span class="font-technical-data text-[10px] tracking-widest text-white/70 uppercase">INKSTAMP</span>
+<span class="text-white/40 text-xs font-light">/</span>
+<h1 class="font-headline-sm text-sm text-white font-medium lowercase tracking-tight">máy ảnh</h1>
+</div>
+<!-- Right Controls: Flash & Lens Flip -->
+<div class="flex items-center gap-2">
+<!-- Flash toggle button -->
+<button aria-label="Flash Toggle" class="w-9 h-9 rounded-full bg-black/30 backdrop-blur-md border border-white/15 text-white flex items-center justify-center active:scale-90 transition-transform cursor-pointer shadow-sm hover:bg-black/40" id="btn-flash" type="button">
+<span class="material-symbols-outlined text-[18px]" id="flash-icon">flash_off</span>
+</button>
+<!-- Lens Flip button -->
+<button aria-label="Flip Camera" class="w-9 h-9 rounded-full bg-black/30 backdrop-blur-md border border-white/15 text-white flex items-center justify-center active:scale-90 transition-transform cursor-pointer shadow-sm hover:bg-black/40" id="btn-flip" type="button">
+<span class="material-symbols-outlined text-[18px] transition-transform duration-300" id="flip-icon">flip_camera_ios</span>
+</button>
+</div>
+</div>
+</header>
+<!-- Shutter Burst Flash Feedback Screen -->
+<div class="fixed inset-0 bg-white opacity-0 pointer-events-none transition-opacity duration-150 z-50" id="shutter-flash"></div>
+<!-- Toast notification upon capture -->
+<div class="fixed top-16 left-1/2 -translate-x-1/2 z-50 opacity-0 pointer-events-none transition-all duration-300 bg-surface-container-lowest/95 backdrop-blur-md text-on-surface px-4 py-1.5 rounded-full flex items-center gap-2 shadow-lg" id="capture-toast">
+<span class="material-symbols-outlined text-[16px] text-primary">verified</span>
+<span class="font-label-sm text-xs font-medium text-primary">Đã lưu tem ảnh #142</span>
+</div>
+<!-- Bottom Camera Deck: Zoom Selector + Shutter Bar -->
+<div class="fixed inset-x-0 bottom-16 z-30 flex flex-col items-center pb-3">
+<!-- Focal Length / Zoom Selector Pill -->
+<div class="mb-4 inline-flex items-center p-0.5 rounded-full bg-black/40 backdrop-blur-md border border-white/15 shadow-sm">
+<button class="px-3 py-1 rounded-full text-white/60 hover:text-white text-xs font-technical-data transition-all zoom-btn" data-zoom="0.8" type="button">28mm</button>
+<button class="px-3 py-1 rounded-full bg-white text-black font-semibold text-xs font-technical-data shadow-sm transition-all zoom-btn active-zoom" data-zoom="1.0" type="button">35mm</button>
+<button class="px-3 py-1 rounded-full text-white/60 hover:text-white text-xs font-technical-data transition-all zoom-btn" data-zoom="1.3" type="button">50mm</button>
+</div>
+<!-- Primary Bottom Controls Bar (Thumb Zone) -->
+<div class="w-full px-8 flex items-center justify-between max-w-md">
+<!-- Left: Stamp-shaped Thumbnail of Previous Capture (#141) with perforated border -->
+<button aria-label="Xem tem gần nhất #141" class="relative group cursor-pointer active:scale-95 transition-transform" id="btn-recent-stamp" type="button">
+<div class="relative w-11 h-14 p-0.5 bg-white/90 rounded-[2px] shadow-md flex flex-col items-center justify-between stamp-border">
+<!-- Scalloped miniature edge effect -->
+<div class="w-full flex-1 overflow-hidden rounded-[1px] bg-stone-800">
+<img alt="Bản chụp #141" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida/AEtjO1WvkaSHsg5mxQGzei9cSrlHWTw0jMWbnJvmliFmbDv84SeXkH-f4L0DdbjXjeztUCr3AEd6LkG2_3_YWJSF8IgzSQtdY4HNnfDBIDUiaEeOt3MWi6ZCv3diibZlVNO7jgQBv-VCvQLzJxev_Px103HyUV9-4R6xGiaj8R3xADtgbMYDeHXH2ik3D_JOP8lcWwaDyY7MECTWJgZTvW2HctWYAuRSfOjxVILZ2Wf9MMiCLnCOxF6tPf5iJ1U"/>
+</div>
+<span class="font-technical-data text-[7.5px] font-bold text-stone-700 tracking-wider pt-0.5 uppercase">#141</span>
+</div>
+</button>
+<!-- Center: Large tactile Shutter Button -->
+<div class="relative flex items-center justify-center">
+<button aria-label="Chụp tem ảnh" class="w-20 h-20 rounded-full flex items-center justify-center bg-white/20 backdrop-blur-sm p-1.5 active:scale-90 transition-transform duration-150 cursor-pointer shadow-lg outline-none" id="shutter-trigger" style="box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.8), 0 8px 24px rgba(0, 0, 0, 0.35);" type="button">
+<!-- Inner solid ivory disc with smooth tactile inset -->
+<div class="w-full h-full rounded-full bg-surface-container-lowest flex items-center justify-center shadow-inner hover:scale-[0.98] transition-transform">
+<div class="w-14 h-14 rounded-full border border-stone-200 flex items-center justify-center bg-white">
+<span class="w-2.5 h-2.5 rounded-full bg-primary/20"></span>
+</div>
+</div>
+</button>
+</div>
+<!-- Right: Camera Settings / Aspect Ratio / Grid Toggle -->
+<button aria-label="Cài đặt máy ảnh" class="w-11 h-11 rounded-full bg-black/35 backdrop-blur-md border border-white/20 text-white flex items-center justify-center active:scale-90 transition-all cursor-pointer shadow-md hover:bg-black/45" id="btn-grid-toggle" type="button">
+<span class="material-symbols-outlined text-[20px]" id="grid-icon">grid_view</span>
+</button>
+</div>
+</div>
+<!-- Persistent Bottom Navigation Bar (Warm Off-white Surface) -->
+<nav class="fixed bottom-0 inset-x-0 z-40 pb-safe bg-surface/95 backdrop-blur-xl border-t border-outline-variant/30 shadow-[0_-2px_10px_rgba(0,0,0,0.04)]" data-active-classes="text-primary font-medium">
+<div class="flex justify-around items-center h-16 px-space-sm">
+<a class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] text-on-surface-variant hover:text-on-surface transition-colors" data-path="khoanh-khac" href="#">
+<span class="material-symbols-outlined text-[20px]">photo_library</span>
+<span class="font-label-sm text-label-sm mt-0.5 tracking-tight">Khoảnh khắc</span>
+</a>
+<a class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] text-on-surface-variant hover:text-on-surface transition-colors" data-path="lich" href="#">
+<span class="material-symbols-outlined text-[20px]">calendar_today</span>
+<span class="font-label-sm text-label-sm mt-0.5 tracking-tight">Lịch</span>
+</a>
+<a class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] text-primary font-medium transition-colors relative" data-path="may-anh" href="#">
+<span class="material-symbols-outlined text-[22px] font-semibold">photo_camera</span>
+<span class="font-label-sm text-label-sm mt-0.5 tracking-tight">Máy ảnh</span>
+<!-- Subtle active indicator dot -->
+<span class="w-1 h-1 rounded-full bg-primary mt-0.5"></span>
+</a>
+<a class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] text-on-surface-variant hover:text-on-surface transition-colors" data-path="ca-nhan" href="#">
+<span class="material-symbols-outlined text-[20px]">person</span>
+<span class="font-label-sm text-label-sm mt-0.5 tracking-tight">Cá nhân</span>
+</a>
+</div>
+</nav>
+<script>
+  (function initCamera() {
+    const shutter = document.getElementById('shutter-trigger');
+    const shutterFlash = document.getElementById('shutter-flash');
+    const toast = document.getElementById('capture-toast');
+    const flashBtn = document.getElementById('btn-flash');
+    const flashIcon = document.getElementById('flash-icon');
+    const flipBtn = document.getElementById('btn-flip');
+    const flipIcon = document.getElementById('flip-icon');
+    const cameraFeed = document.getElementById('camera-feed');
+    const stampTarget = document.getElementById('stamp-target');
+    const focusReticle = document.getElementById('focus-reticle');
+    const zoomBtns = document.querySelectorAll('.zoom-btn');
+    const gridBtn = document.getElementById('btn-grid-toggle');
+    const gridIcon = document.getElementById('grid-icon');
+
+    // Flash cycle
+    const flashModes = [
+      { icon: 'flash_off', label: 'Tắt' },
+      { icon: 'flash_auto', label: 'Tự động' },
+      { icon: 'flash_on', label: 'Bật' }
+    ];
+    let flashIdx = 0;
+    flashBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      flashIdx = (flashIdx + 1) % flashModes.length;
+      flashIcon.textContent = flashModes[flashIdx].icon;
+    });
+
+    // Flip camera
+    let flipped = false;
+    flipBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      flipped = !flipped;
+      flipIcon.style.transform = flipped ? 'rotate(180deg)' : 'rotate(0deg)';
+      cameraFeed.style.transform = flipped ? 'scaleX(-1)' : 'scaleX(1)';
+    });
+
+    // Shutter Trigger
+    let capturing = false;
+    shutter?.addEventListener('click', () => {
+      if (capturing) return;
+      capturing = true;
+
+      // Flash feedback
+      shutterFlash.style.opacity = '0.85';
+      setTimeout(() => {
+        shutterFlash.style.opacity = '0';
+      }, 90);
+
+      // Toast feedback
+      setTimeout(() => {
+        toast.style.opacity = '1';
+        toast.style.transform = 'translate(-50%, 8px)';
+      }, 120);
+
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translate(-50%, 0px)';
+        capturing = false;
+      }, 1600);
+    });
+
+    // Focal length / Zoom selector
+    zoomBtns.forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        zoomBtns.forEach(b => {
+          b.className = 'px-3 py-1 rounded-full text-white/60 hover:text-white text-xs font-technical-data transition-all zoom-btn';
+        });
+        btn.className = 'px-3 py-1 rounded-full bg-white text-black font-semibold text-xs font-technical-data shadow-sm transition-all zoom-btn active-zoom';
+        const zoomLevel = parseFloat(btn.dataset.zoom || '1.0');
+        cameraFeed.style.transform = `${flipped ? 'scaleX(-1)' : 'scaleX(1)'} scale(${zoomLevel})`;
+      });
+    });
+
+    // Tap to focus on stamp area
+    stampTarget?.addEventListener('click', (e) => {
+      const rect = stampTarget.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      focusReticle.style.left = `${Math.max(24, Math.min(x, rect.width - 24))}px`;
+      focusReticle.style.top = `${Math.max(24, Math.min(y, rect.height - 24))}px`;
+      focusReticle.style.opacity = '1';
+      focusReticle.style.transform = 'translate(-50%, -50%) scale(1.1)';
+
+      setTimeout(() => {
+        focusReticle.style.transform = 'translate(-50%, -50%) scale(0.95)';
+      }, 140);
+
+      setTimeout(() => {
+        focusReticle.style.opacity = '0';
+      }, 1100);
+    });
+
+    // Grid toggle
+    gridBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      gridBtn.classList.toggle('text-[#f59e0b]');
+    });
+  })();
+</script>
+</body></html>

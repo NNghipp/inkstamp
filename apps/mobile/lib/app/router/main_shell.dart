@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:inkstamp/app/router/app_routes.dart';
-import 'package:inkstamp/app/theme/app_colors.dart';
 
 class MainShell extends StatelessWidget {
   const MainShell({required this.child, super.key});
@@ -12,70 +11,103 @@ class MainShell extends StatelessWidget {
   Widget build(BuildContext context) {
     final String location = GoRouterState.of(context).uri.path;
     final int selectedIndex = switch (location) {
-      String value when value.startsWith('/inbox') => 0,
-      String value when value.startsWith('/camera') => 1,
-      String value when value.startsWith('/calendar') => 2,
-      _ => 3,
+      String value when value.startsWith('/calendar') => 1,
+      String value when value.startsWith('/camera') => 2,
+      String value when value.startsWith('/profile') => 3,
+      _ => 0,
     };
 
     return Scaffold(
       body: child,
-      bottomNavigationBar: NavigationBar(
+      bottomNavigationBar: _EditorialNavigation(
         selectedIndex: selectedIndex,
-        onDestinationSelected: (int index) {
-          final String route = switch (index) {
-            0 => AppRoutes.inbox,
-            1 => AppRoutes.camera,
-            2 => AppRoutes.calendar,
-            _ => AppRoutes.friends,
-          };
-          context.go(route);
-        },
-        destinations: const <NavigationDestination>[
-          NavigationDestination(
-            icon: Icon(Icons.mail_outline_rounded),
-            selectedIcon: Icon(Icons.mail_rounded),
-            label: 'Inbox',
-          ),
-          NavigationDestination(
-            icon: _CameraDestinationIcon(selected: false),
-            selectedIcon: _CameraDestinationIcon(selected: true),
-            label: 'Camera',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.calendar_today_outlined),
-            selectedIcon: Icon(Icons.calendar_month_rounded),
-            label: 'Calendar',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.people_outline_rounded),
-            selectedIcon: Icon(Icons.people_rounded),
-            label: 'Friends',
-          ),
-        ],
+        onSelected: (int index) => context.go(
+          <String>[
+            AppRoutes.home,
+            AppRoutes.calendar,
+            AppRoutes.camera,
+            AppRoutes.profile,
+          ][index],
+        ),
       ),
     );
   }
 }
 
-class _CameraDestinationIcon extends StatelessWidget {
-  const _CameraDestinationIcon({required this.selected});
+class _EditorialNavigation extends StatelessWidget {
+  const _EditorialNavigation({
+    required this.selectedIndex,
+    required this.onSelected,
+  });
 
-  final bool selected;
+  final int selectedIndex;
+  final ValueChanged<int> onSelected;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 40,
-      height: 40,
-      decoration: BoxDecoration(
-        color: selected ? AppColors.ink : AppColors.sky,
-        shape: BoxShape.circle,
+    const List<(IconData, String)> items = <(IconData, String)>[
+      (Icons.photo_library_outlined, 'Khoảnh khắc'),
+      (Icons.calendar_today_outlined, 'Lịch'),
+      (Icons.photo_camera_outlined, 'Máy ảnh'),
+      (Icons.person_outline, 'Cá nhân'),
+    ];
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        color: Color(0xFFF9F9F6),
+        border: Border(top: BorderSide(color: Color(0x18777771))),
       ),
-      child: Icon(
-        Icons.camera_alt_rounded,
-        color: selected ? AppColors.white : AppColors.ink,
-        size: 21,
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 64,
+          child: Row(
+            children: List<Widget>.generate(items.length, (int index) {
+              final bool selected = index == selectedIndex;
+              return Expanded(
+                child: InkWell(
+                  onTap: () => onSelected(index),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: <Widget>[
+                      Icon(
+                        items[index].$1,
+                        size: selected ? 22 : 20,
+                        color: selected
+                            ? const Color(0xFF111210)
+                            : const Color(0xFF5B5C57),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        items[index].$2,
+                        style: TextStyle(
+                          color: selected
+                              ? const Color(0xFF111210)
+                              : const Color(0xFF494A46),
+                          fontSize: 11,
+                          fontWeight: selected
+                              ? FontWeight.w600
+                              : FontWeight.w400,
+                        ),
+                      ),
+                      SizedBox(
+                        height: 3,
+                        child: selected && index == 2
+                            ? const DecoratedBox(
+                                decoration: BoxDecoration(
+                                  color: Colors.black,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: SizedBox.square(dimension: 3),
+                              )
+                            : null,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+          ),
+        ),
       ),
     );
   }

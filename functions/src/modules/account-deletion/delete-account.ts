@@ -14,7 +14,7 @@ export const deleteAccount = onCall(
   },
   async (request) => {
     try {
-      const userId = requireAuth(request);
+      const userId = await requireAuth(request);
       const userReference = firestore.doc(`users/${userId}`);
       const user = await userReference.get();
       const username = user.get("username") as string | undefined;

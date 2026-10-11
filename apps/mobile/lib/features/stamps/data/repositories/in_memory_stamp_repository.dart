@@ -68,6 +68,35 @@ class InMemoryStampRepository implements StampRepository {
   final Uuid _uuid = const Uuid();
 
   @override
+  Future<StampPage> fetchReceivedPage({
+    StampCursor? after,
+    int limit = 25,
+  }) async => pageStamps(_received, after, limit);
+
+  @override
+  Future<List<Stamp>> fetchMonth(DateTime start, DateTime end) async =>
+      [..._received, ..._sent]
+          .where(
+            (s) => !s.createdAt.isBefore(start) && s.createdAt.isBefore(end),
+          )
+          .toList()
+        ..sort(compareStamps);
+
+  @override
+  Future<Stamp?> getById(String id) async {
+    for (final stamp in [..._received, ..._sent]) {
+      if (stamp.id == id) return stamp;
+    }
+    return null;
+  }
+
+  @override
+  Future<void> markDeliveryRead(String id) async {
+    final index = _received.indexWhere((s) => s.id == id);
+    if (index >= 0) _received[index] = _received[index].copyWith(isSeen: true);
+  }
+
+  @override
   Future<List<Stamp>> getReceived() async =>
       List<Stamp>.unmodifiable(_received);
 

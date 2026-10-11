@@ -7,10 +7,10 @@ import { firestore } from "../../shared/firebase/admin.js";
 import { onboardingStepSchema } from "../../shared/validation/schemas.js";
 
 export const updateOnboardingStep = onCall(
-  { region, enforceAppCheck: true },
+  { region, enforceAppCheck },
   async (request) => {
     try {
-      const userId = requireAuth(request);
+      const userId = await requireAuth(request);
       const { step } = onboardingStepSchema.parse(request.data);
       const userReference = firestore.doc(`users/${userId}`);
       const snapshot = await userReference.get();
@@ -28,3 +28,4 @@ export const updateOnboardingStep = onCall(
     }
   },
 );
+import { enforceAppCheck } from "../../config/callable-security.js";

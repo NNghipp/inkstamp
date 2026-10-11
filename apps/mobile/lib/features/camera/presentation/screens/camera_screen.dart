@@ -1,123 +1,496 @@
+import 'dart:async';
+import 'dart:ui';
+
+import 'package:camera/camera.dart' as camera;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:inkstamp/app/router/app_routes.dart';
-import 'package:inkstamp/app/theme/app_colors.dart';
-import 'package:inkstamp/app/theme/app_spacing.dart';
-import 'package:inkstamp/features/stamps/presentation/controllers/stamp_composer_controller.dart';
+import 'package:inkstamp/app/theme/app_motion.dart';
+import 'package:inkstamp/core/widgets/editorial_ui.dart';
+import 'package:inkstamp/core/widgets/motion_feedback.dart';
+import 'package:inkstamp/features/camera/data/repositories/dev_asset_capture_source.dart';
+import 'package:inkstamp/features/camera/presentation/controllers/camera_controller.dart';
 
 class CameraScreen extends ConsumerStatefulWidget {
-  const CameraScreen({super.key});
+  const CameraScreen({this.initializeCamera = true, super.key});
+
+  final bool initializeCamera;
 
   @override
   ConsumerState<CameraScreen> createState() => _CameraScreenState();
 }
 
-class _CameraScreenState extends ConsumerState<CameraScreen> {
-  bool _frontCamera = false;
-  bool _flashEnabled = false;
+class _CameraScreenState extends ConsumerState<CameraScreen>
+    with WidgetsBindingObserver {
+  late final InkstampCameraController _controller;
+  int? _cameraLease;
+  double _zoom = 1;
+  Timer? _flashTimer;
+  Timer? _focusTimer;
+  bool _shutterFlash = false;
+  Offset? _focusPoint;
+  int _focusRevision = 0;
+  bool _navigating = false;
+  bool _choosingSample = false;
+  bool _focusVisible = false;
+  bool _showGrid = false;
+  double _lensTurns = 0;
+
+  Future<void> _switchLens() async {
+    if (ref.read(cameraControllerProvider).phase != CameraPhase.ready) return;
+    setState(() => _lensTurns += .5);
+    await _controller.switchLens();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _controller = ref.read(cameraControllerProvider.notifier);
+    if (widget.initializeCamera) _cameraLease = _controller.acquireSession();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (widget.initializeCamera) {
+      _controller.onLifecycleChanged(state);
+    }
+  }
+
+  @override
+  void dispose() {
+    _flashTimer?.cancel();
+    _focusTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    if (widget.initializeCamera) {
+      // Riverpod state must not be changed while the router unmounts widgets.
+      _controller.releaseSession(_cameraLease!);
+    }
+    super.dispose();
+  }
+
+  Future<void> _capture(CameraControllerState state) async {
+    if (_navigating || _choosingSample || state.phase != CameraPhase.ready) {
+      return;
+    }
+    _navigating = true;
+    try {
+      await _openCapturedPreview(await _controller.capture());
+    } finally {
+      _navigating = false;
+    }
+  }
+
+  Future<void> _chooseSample() async {
+    if (!devAssetCaptureEnabled || _navigating || _choosingSample) return;
+    _choosingSample = true;
+    try {
+      final images = await ref.read(devAssetCaptureSourceProvider).listImages();
+      if (!mounted) return;
+      if (images.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No supported images in assets/image_test/.'),
+          ),
+        );
+        return;
+      }
+      final selected = await showModalBottomSheet<String>(
+        context: context,
+        builder: (context) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const ListTile(title: Text('DEV sample capture')),
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: images.length,
+                  itemBuilder: (context, index) => ListTile(
+                    leading: const Icon(Icons.image_outlined),
+                    title: Text(images[index].split('/').last),
+                    onTap: () => Navigator.pop(context, images[index]),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (selected == null || !mounted) return;
+      _navigating = true;
+      await _openCapturedPreview(await _controller.captureDevAsset(selected));
+    } on Object {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to load the DEV sample image.')),
+        );
+      }
+    } finally {
+      _choosingSample = false;
+      _navigating = false;
+    }
+  }
+
+  Future<void> _openCapturedPreview(bool captured) async {
+    if (captured && mounted) {
+      await _controller.suspend(waitForPreviewFrame: true);
+    }
+    if (captured && mounted) {
+      await context.push(AppRoutes.cameraPreview);
+      if (mounted && widget.initializeCamera) await _controller.initialize();
+    }
+  }
+
+  Future<void> _focus(TapDownDetails details, Size size) async {
+    final point = details.localPosition;
+    final supported = await _controller.focusAt(
+      Offset(
+        (point.dx / size.width).clamp(0, 1),
+        (point.dy / size.height).clamp(0, 1),
+      ),
+    );
+    if (!supported || !mounted) return;
+    _focusTimer?.cancel();
+    setState(() {
+      _focusPoint = point;
+      _focusRevision++;
+      _focusVisible = true;
+    });
+    _focusTimer = Timer(AppMotion.focusHold, () {
+      if (mounted) setState(() => _focusVisible = false);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.ink,
-      body: SafeArea(
-        child: Stack(
-          children: <Widget>[
-            Positioned.fill(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 12, 12, 102),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(34),
-                  child: const _CameraPreviewSimulation(),
+    if (widget.initializeCamera) {
+      ref.listen(cameraControllerProvider, (previous, next) {
+        if (previous?.phase == CameraPhase.capturing &&
+            next.phase == CameraPhase.processing) {
+          _flashTimer?.cancel();
+          setState(() => _shutterFlash = true);
+          _flashTimer = Timer(AppMotion.shutter, () {
+            if (mounted) setState(() => _shutterFlash = false);
+          });
+        }
+      });
+    }
+    final CameraControllerState state = widget.initializeCamera
+        ? ref.watch(cameraControllerProvider)
+        : const CameraControllerState(phase: CameraPhase.unavailable);
+    return ColoredBox(
+      color: Colors.black,
+      child: Stack(
+        fit: StackFit.expand,
+        children: <Widget>[
+          AnimatedOpacity(
+            opacity: state.phase == CameraPhase.initializing ? .75 : 1,
+            duration: AppMotion.duration(context, AppMotion.fast),
+            child: _CameraFeed(
+              state: state,
+              zoom: _zoom,
+              designPreview: !widget.initializeCamera,
+            ),
+          ),
+          const _CameraShade(),
+          Positioned.fill(
+            child: LayoutBuilder(
+              builder: (context, constraints) => GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTapDown: widget.initializeCamera
+                    ? (details) => _focus(details, constraints.biggest)
+                    : null,
+              ),
+            ),
+          ),
+          if (_focusPoint != null)
+            Positioned(
+              left: _focusPoint!.dx - 22,
+              top: _focusPoint!.dy - 22,
+              child: IgnorePointer(
+                child: AnimatedOpacity(
+                  opacity: _focusVisible ? 1 : 0,
+                  duration: AppMotion.duration(context, AppMotion.fast),
+                  child: TweenAnimationBuilder<double>(
+                    key: ValueKey(_focusRevision),
+                    tween: Tween(begin: 1.1, end: 1),
+                    duration: AppMotion.duration(context, AppMotion.fast),
+                    builder: (_, value, child) =>
+                        Transform.scale(scale: value, child: child),
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: .8),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
-            Positioned(
-              left: 24,
-              right: 24,
-              top: 24,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: <Widget>[
-                  _CameraControl(
-                    icon: _flashEnabled
-                        ? Icons.flash_on_rounded
-                        : Icons.flash_off_rounded,
-                    label: 'Flash',
-                    onPressed: () {
-                      setState(() => _flashEnabled = !_flashEnabled);
-                    },
-                  ),
-                  const Text(
-                    'INKSTAMP',
-                    style: TextStyle(
-                      color: AppColors.white,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 2,
-                    ),
-                  ),
-                  _CameraControl(
-                    icon: Icons.cameraswitch_rounded,
-                    label: 'Switch camera',
-                    onPressed: () {
-                      setState(() => _frontCamera = !_frontCamera);
-                    },
-                  ),
-                ],
-              ),
+          IgnorePointer(
+            child: AnimatedOpacity(
+              opacity: _shutterFlash ? .12 : 0,
+              duration: AppMotion.duration(context, AppMotion.shutter),
+              child: const ColoredBox(color: Colors.white),
             ),
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 20,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: <Widget>[
-                  Container(
-                    width: 78,
-                    height: 78,
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.white, width: 3),
-                    ),
-                    child: Semantics(
-                      button: true,
-                      label: 'Take photo',
-                      child: InkWell(
-                        customBorder: const CircleBorder(),
-                        onTap: () {
-                          final String? replyTo = ref
-                              .read(stampComposerControllerProvider)
-                              .replyToStampId;
-                          ref
-                              .read(stampComposerControllerProvider.notifier)
-                              .capture(replyToStampId: replyTo);
-                          context.push(AppRoutes.cameraPreview);
-                        },
-                        child: const DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: AppColors.white,
-                            shape: BoxShape.circle,
+          ),
+          SafeArea(
+            bottom: false,
+            child: Stack(
+              children: <Widget>[
+                Positioned(
+                  left: 20,
+                  right: 20,
+                  top: 4,
+                  child: Row(
+                    children: <Widget>[
+                      const _DarkPill(child: _CameraTitle()),
+                      const Spacer(),
+                      if (devAssetCaptureEnabled &&
+                          widget.initializeCamera) ...[
+                        _RoundControl(
+                          tooltip: 'DEV sample capture',
+                          icon: Icons.image_outlined,
+                          onPressed: state.isBusy ? null : _chooseSample,
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      _RoundControl(
+                        tooltip: 'Flash',
+                        icon: state.flashEnabled
+                            ? Icons.flash_on_outlined
+                            : Icons.flash_off_outlined,
+                        onPressed: state.phase == CameraPhase.ready
+                            ? _controller.toggleFlash
+                            : null,
+                        active: state.flashEnabled,
+                      ),
+                      const SizedBox(width: 8),
+                      _RoundControl(
+                        tooltip: 'Switch camera',
+                        icon: Icons.flip_camera_ios_outlined,
+                        turns: _lensTurns,
+                        onPressed: state.phase == CameraPhase.ready
+                            ? _switchLens
+                            : null,
+                      ),
+                    ],
+                  ),
+                ),
+                Center(
+                  child: Transform.translate(
+                    offset: const Offset(0, 8),
+                    child: FractionallySizedBox(
+                      widthFactor: 0.81,
+                      child: AspectRatio(
+                        aspectRatio: 3.2 / 4.2,
+                        child: CustomPaint(
+                          foregroundPainter: _StampFramePainter(),
+                          child: const Padding(
+                            padding: EdgeInsets.all(15),
+                            child: _StampFrameContent(),
                           ),
                         ),
                       ),
                     ),
                   ),
-                ],
+                ),
+                if (state.errorMessage != null)
+                  Positioned(
+                    top: 90,
+                    left: 70,
+                    right: 70,
+                    child: _CameraError(
+                      message: state.errorMessage!,
+                      onRetry: _controller.initialize,
+                    ),
+                  ),
+                if (state.isBusy)
+                  const Center(
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  ),
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 91,
+                  child: Center(
+                    child: _ZoomSelector(
+                      zoom: _zoom,
+                      onChanged: (double value) =>
+                          setState(() => _zoom = value),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: 30,
+                  right: 30,
+                  bottom: 0,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: <Widget>[
+                      const _RecentStamp(),
+                      PressFeedback(
+                        enabled: state.phase == CameraPhase.ready,
+                        child: _Shutter(
+                          busy:
+                              state.phase == CameraPhase.capturing ||
+                              state.phase == CameraPhase.processing,
+                          onTap: state.phase == CameraPhase.ready
+                              ? () => _capture(state)
+                              : null,
+                        ),
+                      ),
+                      _RoundControl(
+                        tooltip: 'Grid',
+                        icon: Icons.grid_view_outlined,
+                        size: 48,
+                        active: _showGrid,
+                        onPressed: () => setState(() => _showGrid = !_showGrid),
+                      ),
+                    ],
+                  ),
+                ),
+                if (_showGrid)
+                  const Positioned.fill(
+                    child: IgnorePointer(
+                      child: CustomPaint(painter: _GridPainter()),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CameraFeed extends StatelessWidget {
+  const _CameraFeed({
+    required this.state,
+    required this.zoom,
+    this.designPreview = false,
+  });
+  final CameraControllerState state;
+  final double zoom;
+  final bool designPreview;
+
+  @override
+  Widget build(BuildContext context) {
+    final Object? handle = state.previewHandle;
+    final Widget feed;
+    if (handle is camera.CameraController && handle.value.isInitialized) {
+      final portrait =
+          MediaQuery.orientationOf(context) == Orientation.portrait;
+      final size = handle.value.previewSize!;
+      feed = FittedBox(
+        fit: BoxFit.cover,
+        child: SizedBox(
+          width: portrait ? size.height : size.width,
+          height: portrait ? size.width : size.height,
+          child: camera.CameraPreview(handle),
+        ),
+      );
+    } else {
+      feed = designPreview
+          ? Image.asset(EditorialAssets.camera, fit: BoxFit.cover)
+          : const ColoredBox(color: Colors.black);
+    }
+    return ClipRect(
+      child: Transform.scale(
+        scale: zoom,
+        child: SizedBox.expand(
+          child: ColoredBox(color: Colors.black, child: feed),
+        ),
+      ),
+    );
+  }
+}
+
+class _CameraShade extends StatelessWidget {
+  const _CameraShade();
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: <Color>[
+            Colors.black.withValues(alpha: 0.43),
+            Colors.transparent,
+            Colors.black.withValues(alpha: 0.59),
+          ],
+          stops: const <double>[0, 0.46, 1],
+        ),
+      ),
+    );
+  }
+}
+
+class _DarkPill extends StatelessWidget {
+  const _DarkPill({required this.child});
+  final Widget child;
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(30),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+        child: ColoredBox(
+          color: Colors.black.withValues(alpha: 0.35),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 13),
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CameraTitle extends StatelessWidget {
+  const _CameraTitle();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SizedBox(
+      width: 118,
+      height: 48,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Text(
+              'INKSTAMP',
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 1.2,
               ),
             ),
-            Positioned(
-              bottom: 42,
-              right: 34,
-              child: Text(
-                _frontCamera ? 'FRONT' : 'BACK',
-                style: TextStyle(
-                  color: AppColors.white.withValues(alpha: 0.72),
-                  fontSize: 11,
-                  letterSpacing: 1.2,
-                ),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 7),
+              child: Text('/', style: TextStyle(color: Colors.white38)),
+            ),
+            Text(
+              'máy ảnh',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],
@@ -127,34 +500,303 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
   }
 }
 
-class _CameraPreviewSimulation extends StatelessWidget {
-  const _CameraPreviewSimulation();
+class _RoundControl extends StatelessWidget {
+  const _RoundControl({
+    required this.tooltip,
+    required this.icon,
+    this.onPressed,
+    this.size = 44,
+    this.turns = 0,
+    this.active = false,
+  });
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback? onPressed;
+  final double size;
+  final double turns;
+  final bool active;
 
   @override
   Widget build(BuildContext context) {
-    return CustomPaint(
-      painter: _CameraScenePainter(),
-      child: Stack(
-        children: <Widget>[
-          Positioned(
-            left: AppSpacing.lg,
-            right: AppSpacing.lg,
-            bottom: AppSpacing.lg,
-            child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.md,
-                vertical: AppSpacing.sm,
-              ),
-              decoration: BoxDecoration(
-                color: AppColors.ink.withValues(alpha: 0.42),
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: const Text(
-                'Keep your moment inside the frame',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: AppColors.white),
+    return Semantics(
+      button: true,
+      enabled: onPressed != null,
+      label: tooltip,
+      child: SizedBox.square(
+        dimension: size,
+        child: IconButton(
+          tooltip: tooltip,
+          padding: EdgeInsets.zero,
+          onPressed: onPressed,
+          style: IconButton.styleFrom(
+            foregroundColor: Colors.white,
+            backgroundColor: const Color(0x66201F1B),
+            disabledForegroundColor: Colors.white,
+            disabledBackgroundColor: const Color(0x66201F1B),
+            side: const BorderSide(color: Color(0x55FFFFFF)),
+          ),
+          icon: AnimatedRotation(
+            turns: turns,
+            duration: AppMotion.duration(context, AppMotion.standard),
+            child: AnimatedSwitcher(
+              duration: AppMotion.duration(context, AppMotion.fast),
+              child: Icon(
+                icon,
+                key: ValueKey(icon),
+                size: 21,
+                color: active ? const Color(0xFFFFC568) : Colors.white,
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GridPainter extends CustomPainter {
+  const _GridPainter();
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withValues(alpha: .35)
+      ..strokeWidth = .7;
+    for (final part in <double>[1 / 3, 2 / 3]) {
+      canvas.drawLine(
+        Offset(size.width * part, 0),
+        Offset(size.width * part, size.height),
+        paint,
+      );
+      canvas.drawLine(
+        Offset(0, size.height * part),
+        Offset(size.width, size.height * part),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _StampFrameContent extends StatelessWidget {
+  const _StampFrameContent();
+  @override
+  Widget build(BuildContext context) {
+    return const Stack(
+      children: <Widget>[
+        Positioned(
+          top: 7,
+          left: 7,
+          right: 7,
+          child: Row(
+            children: <Widget>[
+              SizedBox(
+                width: 130,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: _ActiveStampBadge(),
+                ),
+              ),
+              Spacer(),
+              TechnicalText('CROP 3:4', color: Colors.white70, fontSize: 10),
+            ],
+          ),
+        ),
+        Positioned(
+          left: 7,
+          right: 7,
+          bottom: 7,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                TechnicalText(
+                  'INKSTAMP · VN-026',
+                  color: Colors.white,
+                  fontSize: 10,
+                  letterSpacing: 1.7,
+                ),
+                SizedBox(width: 30),
+                TechnicalText(
+                  '35MM · N° 0142',
+                  color: Colors.white,
+                  fontSize: 10,
+                  letterSpacing: 1.5,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ActiveStampBadge extends StatelessWidget {
+  const _ActiveStampBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xA035332D),
+        borderRadius: BorderRadius.circular(22),
+      ),
+      child: const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: Color(0xFFFFA900),
+                shape: BoxShape.circle,
+              ),
+              child: SizedBox.square(dimension: 6),
+            ),
+            SizedBox(width: 8),
+            TechnicalText(
+              'STAMP ACTIVE',
+              color: Colors.white,
+              fontSize: 9,
+              letterSpacing: 1.5,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StampFramePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Paint solid = Paint()
+      ..color = Colors.white.withValues(alpha: 0.72)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    canvas.drawRect(
+      Rect.fromLTWH(10, 10, size.width - 20, size.height - 20),
+      solid,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(Offset.zero & size, const Radius.circular(2)),
+      solid,
+    );
+    final Paint dash = Paint()
+      ..color = Colors.white.withValues(alpha: 0.88)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.round;
+    final Path border = Path()
+      ..addRect(Rect.fromLTWH(2, 2, size.width - 4, size.height - 4));
+    for (final PathMetric metric in border.computeMetrics()) {
+      double distance = 0;
+      while (distance < metric.length) {
+        canvas.drawPath(metric.extractPath(distance, distance + 8), dash);
+        distance += 14;
+      }
+    }
+    final Paint corner = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.3;
+    const double inset = 17;
+    const double arm = 14;
+    final Path marks = Path()
+      ..moveTo(inset, inset + arm)
+      ..lineTo(inset, inset)
+      ..lineTo(inset + arm, inset)
+      ..moveTo(size.width - inset - arm, inset)
+      ..lineTo(size.width - inset, inset)
+      ..lineTo(size.width - inset, inset + arm)
+      ..moveTo(inset, size.height - inset - arm)
+      ..lineTo(inset, size.height - inset)
+      ..lineTo(inset + arm, size.height - inset)
+      ..moveTo(size.width - inset - arm, size.height - inset)
+      ..lineTo(size.width - inset, size.height - inset)
+      ..lineTo(size.width - inset, size.height - inset - arm);
+    canvas.drawPath(marks, corner);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _ZoomSelector extends StatelessWidget {
+  const _ZoomSelector({required this.zoom, required this.onChanged});
+  final double zoom;
+  final ValueChanged<double> onChanged;
+  @override
+  Widget build(BuildContext context) {
+    const List<(double, String)> values = <(double, String)>[
+      (0.92, '28mm'),
+      (1, '35mm'),
+      (1.12, '50mm'),
+    ];
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xB026241F),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: const Color(0x44FFFFFF)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(2),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: values.map(((double, String) item) {
+            final bool selected = item.$1 == zoom;
+            return GestureDetector(
+              onTap: () => onChanged(item.$1),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: selected ? Colors.white : Colors.transparent,
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 4,
+                  ),
+                  child: Text(
+                    item.$2,
+                    style: TextStyle(
+                      color: selected ? Colors.black : Colors.white60,
+                      fontSize: 11,
+                      fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+}
+
+class _RecentStamp extends StatelessWidget {
+  const _RecentStamp();
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 45,
+      height: 60,
+      padding: const EdgeInsets.all(3),
+      color: Colors.white,
+      child: Column(
+        children: <Widget>[
+          Expanded(
+            child: Image.asset(EditorialAssets.camera, fit: BoxFit.cover),
+          ),
+          const SizedBox(height: 2),
+          const Text(
+            '#141',
+            style: TextStyle(fontSize: 8, fontWeight: FontWeight.w700),
           ),
         ],
       ),
@@ -162,93 +804,82 @@ class _CameraPreviewSimulation extends StatelessWidget {
   }
 }
 
-class _CameraScenePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final Rect bounds = Offset.zero & size;
-    canvas.drawRect(
-      bounds,
-      Paint()
-        ..shader = const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: <Color>[Color(0xFF8EB5D0), Color(0xFFD6C8B7)],
-          stops: <double>[0, 0.72],
-        ).createShader(bounds),
-    );
-
-    final Paint dark = Paint()..color = const Color(0xFF3A3D3D);
-    final double horizon = size.height * 0.71;
-    canvas.drawRect(Rect.fromLTRB(0, horizon, size.width, size.height), dark);
-    canvas.drawPath(
-      Path()
-        ..moveTo(size.width * 0.58, horizon)
-        ..lineTo(size.width, size.height * 0.46)
-        ..lineTo(size.width, size.height)
-        ..lineTo(size.width * 0.71, size.height)
-        ..close(),
-      Paint()..color = const Color(0xFF555657),
-    );
-
-    for (int index = 0; index < 4; index += 1) {
-      final double x = size.width * (0.14 + index * 0.14);
-      final double poleTop = horizon - size.height * (0.24 - index * 0.025);
-      canvas.drawRect(Rect.fromLTWH(x, poleTop, 5, horizon - poleTop), dark);
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(x - 2, poleTop, 44, 8),
-          const Radius.circular(6),
-        ),
-        dark,
-      );
-    }
-
-    final double centerX = size.width * 0.5;
-    canvas.drawCircle(
-      Offset(centerX, horizon - 88),
-      12,
-      Paint()..color = const Color(0xFF2E2927),
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromCenter(
-          center: Offset(centerX, horizon - 47),
-          width: 34,
-          height: 78,
-        ),
-        const Radius.circular(14),
-      ),
-      Paint()..color = const Color(0xFF6D716E),
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _CameraControl extends StatelessWidget {
-  const _CameraControl({
-    required this.icon,
-    required this.label,
-    required this.onPressed,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onPressed;
-
+class _Shutter extends StatelessWidget {
+  const _Shutter({required this.busy, required this.onTap});
+  final bool busy;
+  final VoidCallback? onTap;
   @override
   Widget build(BuildContext context) {
     return Semantics(
+      label: 'Chụp ảnh',
       button: true,
-      label: label,
-      child: IconButton.filledTonal(
-        onPressed: onPressed,
-        style: IconButton.styleFrom(
-          backgroundColor: AppColors.ink.withValues(alpha: 0.42),
-          foregroundColor: AppColors.white,
+      enabled: onTap != null,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 82,
+          height: 82,
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.white.withValues(alpha: 0.2),
+            border: Border.all(color: Colors.white, width: 2),
+          ),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              border: Border.all(color: const Color(0xFFD7D7D2)),
+            ),
+            child: busy
+                ? const Padding(
+                    padding: EdgeInsets.all(18),
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Center(
+                    child: SizedBox.square(
+                      dimension: 8,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Color(0xFFCDCFCD),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                  ),
+          ),
         ),
-        icon: Icon(icon),
+      ),
+    );
+  }
+}
+
+class _CameraError extends StatelessWidget {
+  const _CameraError({required this.message, required this.onRetry});
+  final String message;
+  final VoidCallback onRetry;
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.55)),
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: Column(
+          children: <Widget>[
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white, fontSize: 11),
+            ),
+            TextButton(
+              onPressed: onRetry,
+              child: const Text(
+                'Try again',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

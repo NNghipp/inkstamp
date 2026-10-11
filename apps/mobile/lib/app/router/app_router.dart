@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:inkstamp/app/app.dart';
 import 'package:inkstamp/app/router/app_routes.dart';
 import 'package:inkstamp/app/router/main_shell.dart';
+import 'package:inkstamp/app/theme/app_motion.dart';
 import 'package:inkstamp/features/archive/presentation/screens/archive_day_screen.dart';
 import 'package:inkstamp/features/archive/presentation/screens/archive_stamp_screen.dart';
 import 'package:inkstamp/features/archive/presentation/screens/calendar_screen.dart';
@@ -16,6 +17,7 @@ import 'package:inkstamp/features/friends/presentation/screens/friend_requests_s
 import 'package:inkstamp/features/friends/presentation/screens/friend_search_screen.dart';
 import 'package:inkstamp/features/friends/presentation/screens/friends_screen.dart';
 import 'package:inkstamp/features/friends/presentation/screens/invite_friend_screen.dart';
+import 'package:inkstamp/features/home/presentation/screens/home_screen.dart';
 import 'package:inkstamp/features/inbox/presentation/screens/inbox_screen.dart';
 import 'package:inkstamp/features/inbox/presentation/screens/stamp_detail_screen.dart';
 import 'package:inkstamp/features/inbox/presentation/screens/stamp_reply_screen.dart';
@@ -31,11 +33,7 @@ import 'package:inkstamp/features/settings/presentation/screens/help_screen.dart
 import 'package:inkstamp/features/settings/presentation/screens/notification_settings_screen.dart';
 import 'package:inkstamp/features/settings/presentation/screens/privacy_settings_screen.dart';
 import 'package:inkstamp/features/settings/presentation/screens/settings_screen.dart';
-import 'package:inkstamp/features/stamps/presentation/screens/audience_picker_screen.dart';
-import 'package:inkstamp/features/stamps/presentation/screens/stamp_editor_screen.dart';
 import 'package:inkstamp/features/stamps/presentation/screens/stamp_preview_screen.dart';
-import 'package:inkstamp/features/stamps/presentation/screens/stamp_sending_screen.dart';
-import 'package:inkstamp/features/stamps/presentation/screens/stamp_sent_screen.dart';
 
 // ---------------------------------------------------------------------------
 // Onboarding / unauthenticated routes – the redirect will NOT force a user
@@ -56,13 +54,26 @@ const Set<String> _onboardingPaths = <String>{
 
 final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((Ref ref) {
   final SessionRedirectNotifier redirectNotifier = SessionRedirectNotifier(ref);
+  String? pendingInviteUsername;
 
-  return GoRouter(
+  final router = GoRouter(
     initialLocation: AppRoutes.splash,
     refreshListenable: redirectNotifier,
     redirect: (context, state) {
       final SessionStage stage = ref.read(sessionControllerProvider).stage;
       final String location = state.matchedLocation;
+      final String? inviteUsername = state.pathParameters['username'];
+      if (location.startsWith('/u/') &&
+          (inviteUsername == null ||
+              !RegExp(r'^[a-zA-Z0-9._]{3,20}$').hasMatch(inviteUsername))) {
+        pendingInviteUsername = null;
+        return stage == SessionStage.ready ? AppRoutes.home : AppRoutes.welcome;
+      }
+      if (location.startsWith('/u/') &&
+          inviteUsername != null &&
+          stage != SessionStage.ready) {
+        pendingInviteUsername = inviteUsername;
+      }
 
       // Never redirect while on the splash screen – it auto-navigates.
       if (location == AppRoutes.splash) {
@@ -100,7 +111,12 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((Ref ref) {
         case SessionStage.ready:
           // Fully onboarded – redirect away from onboarding screens.
           if (_onboardingPaths.contains(location)) {
-            return AppRoutes.inbox;
+            if (pendingInviteUsername != null) {
+              final String username = pendingInviteUsername!;
+              pendingInviteUsername = null;
+              return '/u/${Uri.encodeComponent(username)}';
+            }
+            return AppRoutes.home;
           }
           return null;
       }
@@ -134,48 +150,86 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((Ref ref) {
         builder: (context, state, child) => MainShell(child: child),
         routes: <RouteBase>[
           GoRoute(
+            path: AppRoutes.home,
+            pageBuilder: (context, state) => NoTransitionPage<void>(
+              key: state.pageKey,
+              child: const HomeScreen(),
+            ),
+          ),
+          GoRoute(
             path: AppRoutes.inbox,
             builder: (context, state) => const InboxScreen(),
           ),
           GoRoute(
             path: AppRoutes.camera,
-            builder: (context, state) => const CameraScreen(),
+            pageBuilder: (context, state) => NoTransitionPage<void>(
+              key: state.pageKey,
+              child: const CameraScreen(),
+            ),
           ),
           GoRoute(
             path: AppRoutes.calendar,
-            builder: (context, state) => const CalendarScreen(),
+            pageBuilder: (context, state) => NoTransitionPage<void>(
+              key: state.pageKey,
+              child: const CalendarScreen(),
+            ),
           ),
           GoRoute(
             path: AppRoutes.friends,
             builder: (context, state) => const FriendsScreen(),
           ),
+          GoRoute(
+            path: AppRoutes.profile,
+            pageBuilder: (context, state) => NoTransitionPage<void>(
+              key: state.pageKey,
+              child: const SettingsScreen(),
+            ),
+          ),
         ],
       ),
       GoRoute(
         path: AppRoutes.cameraPreview,
-        builder: (context, state) => const StampPreviewScreen(),
+        pageBuilder: (context, state) => CustomTransitionPage<void>(
+          key: state.pageKey,
+          child: const StampPreviewScreen(),
+          transitionDuration: AppMotion.duration(context, AppMotion.screen),
+          reverseTransitionDuration: AppMotion.duration(
+            context,
+            AppMotion.standard,
+          ),
+          transitionsBuilder: (context, animation, secondary, child) =>
+              AppMotion.transition(context, animation, child),
+        ),
       ),
       GoRoute(
         path: AppRoutes.cameraEditor,
-        builder: (context, state) => const StampEditorScreen(),
+        redirect: (_, _) => AppRoutes.cameraPreview,
       ),
       GoRoute(
         path: AppRoutes.cameraAudience,
-        builder: (context, state) => const AudiencePickerScreen(),
+        redirect: (_, _) => AppRoutes.cameraPreview,
       ),
       GoRoute(
         path: AppRoutes.cameraSending,
-        builder: (context, state) => const StampSendingScreen(),
+        redirect: (_, _) => AppRoutes.cameraPreview,
       ),
       GoRoute(
         path: AppRoutes.cameraSuccess,
-        builder: (context, state) => const StampSentScreen(),
+        redirect: (_, _) => AppRoutes.camera,
       ),
       GoRoute(
         path: '/stamp/:stampId',
-        builder: (context, state) {
-          return StampDetailScreen(stampId: state.pathParameters['stampId']!);
-        },
+        pageBuilder: (context, state) => CustomTransitionPage<void>(
+          key: state.pageKey,
+          child: StampDetailScreen(stampId: state.pathParameters['stampId']!),
+          transitionDuration: AppMotion.duration(context, AppMotion.screen),
+          reverseTransitionDuration: AppMotion.duration(
+            context,
+            AppMotion.standard,
+          ),
+          transitionsBuilder: (context, animation, secondary, child) =>
+              AppMotion.transition(context, animation, child),
+        ),
       ),
       GoRoute(
         path: '/stamp/:stampId/reply',
@@ -204,6 +258,12 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((Ref ref) {
       GoRoute(
         path: AppRoutes.friendSearch,
         builder: (context, state) => const FriendSearchScreen(),
+      ),
+      GoRoute(
+        path: '/u/:username',
+        builder: (context, state) => FriendSearchScreen(
+          initialUsername: state.pathParameters['username'],
+        ),
       ),
       GoRoute(
         path: AppRoutes.friendRequests,
@@ -253,4 +313,9 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((Ref ref) {
       ),
     ],
   );
+  ref.onDispose(() {
+    router.dispose();
+    redirectNotifier.dispose();
+  });
+  return router;
 });

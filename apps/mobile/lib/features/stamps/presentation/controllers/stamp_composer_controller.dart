@@ -1,4 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:inkstamp/core/observability/safe_error_reporter.dart';
+import 'package:inkstamp/features/authentication/presentation/controllers/session_controller.dart';
+import 'package:inkstamp/features/camera/data/repositories/local_image_processing_repository.dart';
 import 'package:inkstamp/features/stamps/domain/entities/stamp.dart';
 import 'package:inkstamp/features/stamps/domain/entities/stamp_draft.dart';
 
@@ -9,11 +12,55 @@ stampComposerControllerProvider =
     );
 
 class StampComposerController extends Notifier<StampDraft> {
+  List<String?> _ownedPaths = [];
   @override
-  StampDraft build() => StampDraft.initial();
+  StampDraft build() {
+    ref.watch(sessionControllerProvider.select((s) => s.user?.id));
+    final paths = <String?>[];
+    _ownedPaths = paths;
+    ref.onDispose(() {
+      // Runs on account change as well as scope disposal. Only this draft's
+      // explicit local paths are removed; never scan/delete another directory.
+      LocalImageProcessingRepository()
+          .deleteFiles(paths)
+          .catchError(
+            (Object error, StackTrace stack) => SafeErrorReporter().report(
+              ErrorEvent.draftCleanup,
+              error,
+              stack,
+            ),
+          );
+    });
+    return StampDraft.initial();
+  }
 
-  void capture({String? replyToStampId}) {
+  void beginCapture({String? replyToStampId}) {
     state = StampDraft.initial().copyWith(replyToStampId: replyToStampId);
+  }
+
+  void capture({
+    String? replyToStampId,
+    required String localImagePath,
+    required String localThumbnailPath,
+  }) {
+    _ownedPaths
+      ..clear()
+      ..addAll([localImagePath, localThumbnailPath]);
+    state = StampDraft.initial().copyWith(
+      replyToStampId: replyToStampId,
+      localImagePath: localImagePath,
+      localThumbnailPath: localThumbnailPath,
+    );
+  }
+
+  void clearCapturedFiles() {
+    _ownedPaths.clear();
+    state = state.copyWith(clearLocalImages: true);
+  }
+
+  void reset() {
+    _ownedPaths.clear();
+    state = StampDraft.initial();
   }
 
   void setFrame(StampFrameStyle style) {

@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "build": "tsc --noEmit",
-    "check": "npm run types && npm run build && wrangler deploy --dry-run",
+    "check": "npm run types && npm run build && wrangler deploy --dry-run --env=",
     "test": "vitest run",
-    "types": "wrangler types"
+    "types": "wrangler types --strict-vars=false"
   },
   "dependencies": {
     "jose": "^6.2.10"

@@ -53,3 +53,9 @@ Thumbs.db
 *.p12
 *.cer
 *.mobileprovision
+
+# Portfolio hygiene: keep generated/local artifacts out of the public landing.
+*.apk
+*.aab
+apps/mobile/test/failures/
+/Test Cases Template.xlsx

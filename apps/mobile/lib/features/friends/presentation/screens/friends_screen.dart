@@ -27,6 +27,21 @@ class FriendsScreen extends ConsumerWidget {
       ],
       body: state.isLoading
           ? const Center(child: CircularProgressIndicator())
+          : state.errorMessage != null && state.friends.isEmpty
+          ? Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Text(state.errorMessage!, textAlign: TextAlign.center),
+                  const SizedBox(height: AppSpacing.sm),
+                  FilledButton(
+                    onPressed: () =>
+                        ref.read(friendsControllerProvider.notifier).load(),
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            )
           : ListView(
               padding: const EdgeInsets.only(
                 top: AppSpacing.sm,

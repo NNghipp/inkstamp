@@ -31,11 +31,13 @@ class BlockedUsersScreen extends ConsumerWidget {
                   title: Text(friend.displayName),
                   subtitle: Text('@${friend.username}'),
                   trailing: TextButton(
-                    onPressed: () {
-                      ref
-                          .read(friendsControllerProvider.notifier)
-                          .unblockFriend(friend.id);
-                    },
+                    onPressed: state.busyUserIds.contains(friend.id)
+                        ? null
+                        : () async {
+                            await ref
+                                .read(friendsControllerProvider.notifier)
+                                .unblockFriend(friend.id);
+                          },
                     child: const Text('Unblock'),
                   ),
                 );

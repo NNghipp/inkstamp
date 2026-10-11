@@ -1,29 +1,43 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/painting.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
+import 'package:inkstamp/core/config/functions_backend.dart';
+import 'package:inkstamp/features/authentication/presentation/controllers/session_controller.dart';
 import 'package:inkstamp/features/stamps/data/repositories/cloudinary_upload_repository.dart';
 
 final Provider<CloudinaryDeliveryRepository>
 cloudinaryDeliveryRepositoryProvider = Provider<CloudinaryDeliveryRepository>((
   Ref ref,
 ) {
-  return CloudinaryDeliveryRepository(
+  ref.watch(sessionControllerProvider.select((s) => s.user?.id));
+  final repository = CloudinaryDeliveryRepository(
     gatewayBaseUrl: mediaGatewayBaseUrl,
     authToken: () async => FirebaseAuth.instance.currentUser?.getIdToken(),
-    appCheckToken: () => FirebaseAppCheck.instance.getToken(),
+    appCheckToken: FunctionsBackend.mediaAppCheckToken,
   );
+  ref.onDispose(repository.dispose);
+  return repository;
 });
 
-final mediaDeliveryUrlProvider = FutureProvider.family<String, String>((
-  Ref ref,
-  String publicId,
-) {
-  return ref.watch(cloudinaryDeliveryRepositoryProvider).resolve(publicId);
-});
+final mediaDeliveryUrlProvider = FutureProvider.autoDispose
+    .family<String, String>((Ref ref, String publicId) {
+      final repository = ref.watch(cloudinaryDeliveryRepositoryProvider);
+      // Reauthorize mounted images: a previously valid URL is not proof of
+      // continuing access after revoke/block. No automatic retry on denial.
+      final timer = Timer.periodic(const Duration(seconds: 30), (_) {
+        if (ref.mounted) ref.invalidateSelf();
+      });
+      ref.onCancel(timer.cancel);
+      ref.onDispose(() {
+        timer.cancel();
+        unawaited(repository.evict(publicId));
+      });
+      return repository.resolve(publicId);
+    }, retry: (_, _) => null);
 
 class CloudinaryDeliveryRepository {
   CloudinaryDeliveryRepository({
@@ -43,16 +57,25 @@ class CloudinaryDeliveryRepository {
   final http.Client _client;
   final Map<String, _CachedUrl> _cache = <String, _CachedUrl>{};
 
-  Future<String> resolve(String publicId) async {
-    final _CachedUrl? cached = _cache[publicId];
-    if (cached != null && cached.expiresAt.isAfter(DateTime.now())) {
-      return cached.url;
+  void dispose() {
+    _client.close();
+    for (final id in _cache.keys.toList()) {
+      unawaited(evict(id));
     }
-    final String? idToken = await authToken();
+  }
+
+  Future<void> evict(String publicId) async {
+    final cached = _cache.remove(publicId);
+    if (cached != null) await NetworkImage(cached.url).evict();
+  }
+
+  Future<String> resolve(String publicId) async {
+    // Always check current authorization; do not reuse the four-minute lease.
+    final String? idToken = await authToken().timeout(timeout);
     if (idToken == null || idToken.isEmpty) {
       throw const MediaUploadException('Sign in before loading media.');
     }
-    final String? appCheck = await appCheckToken();
+    final String? appCheck = await appCheckToken().timeout(timeout);
     final http.Response response = await _client
         .post(
           Uri.parse('$gatewayBaseUrl/v1/media/delivery-urls'),
@@ -68,6 +91,7 @@ class CloudinaryDeliveryRepository {
         )
         .timeout(timeout);
     if (response.statusCode != 200) {
+      await evict(publicId);
       throw MediaUploadException(
         'Unable to load media (${response.statusCode}).',
       );

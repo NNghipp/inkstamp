@@ -3,47 +3,43 @@ import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { region } from "../../config/runtime.js";
 import { requireAuth } from "../../shared/auth/require-auth.js";
 import { toHttpsError } from "../../shared/errors/to-https-error.js";
-import { firestore, storage } from "../../shared/firebase/admin.js";
+import { firestore } from "../../shared/firebase/admin.js";
 import { stampIdSchema } from "../../shared/validation/schemas.js";
+import { revokeMedia } from "./revoke-media.js";
 
 export const deleteStampForEveryone = onCall(
-  { region, enforceAppCheck: true, timeoutSeconds: 120 },
+  { region, enforceAppCheck, timeoutSeconds: 120 },
   async (request) => {
     try {
-      const userId = requireAuth(request);
+      const userId = await requireAuth(request);
       const input = stampIdSchema.parse(request.data);
       const stampReference = firestore.doc(`stamps/${input.stampId}`);
-      const stamp = await stampReference.get();
-      if (!stamp.exists) {
-        return { deleted: true };
-      }
-      if (stamp.get("senderId") !== userId) {
-        throw new HttpsError(
-          "permission-denied",
-          "Only the sender can delete this stamp.",
-        );
-      }
-
-      const recipientIds =
-        (stamp.get("recipientIds") as string[] | undefined) ?? [];
-      const batch = firestore.batch();
-      for (const recipientId of recipientIds) {
-        batch.delete(
-          firestore.doc(`users/${recipientId}/deliveries/${input.stampId}`),
-        );
-      }
-      batch.update(stampReference, {
-        status: "deleted",
-        recipientIds: [],
-        recipientCount: 0,
-        deletedAt: FieldValue.serverTimestamp(),
+      const mediaIds = await firestore.runTransaction(async (transaction) => {
+        const stamp = await transaction.get(stampReference);
+        if (!stamp.exists) throw new HttpsError("not-found", "Stamp not found.");
+        if (stamp.get("senderId") !== userId) {
+          throw new HttpsError("permission-denied", "Only the sender can revoke this stamp.");
+        }
+        const media = [stamp.get("cloudinaryPublicId"), stamp.get("cloudinaryThumbnailPublicId")]
+          .filter((id): id is string => typeof id === "string");
+        if (stamp.get("status") === "revoked" || stamp.get("status") === "deleted") return media;
+        const ids = (stamp.get("recipientIds") as string[] | undefined) ?? [];
+        const references = ids.map((id) => firestore.doc(`users/${id}/deliveries/${input.stampId}`));
+        const deliveries = references.length ? await transaction.getAll(...references) : [];
+        for (const delivery of deliveries) {
+          if (delivery.exists) transaction.update(delivery.ref, {
+            status: "revoked", revokedAt: FieldValue.serverTimestamp(),
+          });
+        }
+        transaction.update(stampReference, {
+          status: "revoked", revokedAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        return media;
       });
-      await batch.commit();
-      await storage
-        .bucket()
-        .deleteFiles({ prefix: `stamps/${userId}/${input.stampId}/` });
 
-      return { deleted: true };
+      const mediaDeleted = await revokeMedia(request, mediaIds);
+      return { deleted: true, revoked: true, mediaDeleted };
     } catch (error) {
       throw toHttpsError(error);
     }
@@ -51,10 +47,10 @@ export const deleteStampForEveryone = onCall(
 );
 
 export const removeDelivery = onCall(
-  { region, enforceAppCheck: true },
+  { region, enforceAppCheck },
   async (request) => {
     try {
-      const userId = requireAuth(request);
+      const userId = await requireAuth(request);
       const input = stampIdSchema.parse(request.data);
       await firestore
         .doc(`users/${userId}/deliveries/${input.stampId}`)
@@ -65,3 +61,4 @@ export const removeDelivery = onCall(
     }
   },
 );
+import { enforceAppCheck } from "../../config/callable-security.js";

@@ -1,8 +1,11 @@
+import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:inkstamp/app/theme/app_colors.dart';
+import 'package:inkstamp/core/images/stamp_image_format.dart';
+import 'package:inkstamp/core/widgets/memory_photo.dart';
 import 'package:inkstamp/features/stamps/data/repositories/cloudinary_delivery_repository.dart';
 import 'package:inkstamp/features/stamps/domain/entities/stamp.dart';
 
@@ -23,6 +26,7 @@ class StampArtwork extends ConsumerWidget {
     this.frameStyle = StampFrameStyle.classic,
     this.paperTone = PaperTone.cream,
     this.imageUrl,
+    this.localImagePath,
     this.publicId,
     this.heroTag,
     this.showShadow = true,
@@ -33,12 +37,28 @@ class StampArtwork extends ConsumerWidget {
   final StampFrameStyle frameStyle;
   final PaperTone paperTone;
   final String? imageUrl;
+  final String? localImagePath;
   final String? publicId;
   final Object? heroTag;
   final bool showShadow;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (isProcessedStampImage(localImagePath) ||
+        isProcessedStampImage(publicId)) {
+      final Widget photo = AspectRatio(
+        aspectRatio: 1,
+        child: localImagePath != null
+            ? Image.file(
+                File(localImagePath!),
+                fit: BoxFit.contain,
+                errorBuilder: (_, _, _) =>
+                    const Center(child: Text('Stamp không còn khả dụng.')),
+              )
+            : MemoryPhoto(publicId: publicId),
+      );
+      return heroTag == null ? photo : Hero(tag: heroTag!, child: photo);
+    }
     final AsyncValue<String>? delivery = publicId == null
         ? null
         : ref.watch(mediaDeliveryUrlProvider(publicId!));
@@ -49,7 +69,11 @@ class StampArtwork extends ConsumerWidget {
         aspectRatio: 1,
         child: DecoratedBox(
           decoration: BoxDecoration(color: _getPaperColor(paperTone)),
-          child: resolvedImageUrl == null && delivery?.isLoading != true
+          child:
+              resolvedImageUrl == null &&
+                  localImagePath == null &&
+                  publicId == null &&
+                  delivery?.isLoading != true
               ? CustomPaint(
                   painter: StampArtworkPainter(
                     seed: seed,
@@ -65,19 +89,39 @@ class StampArtwork extends ConsumerWidget {
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(3),
                         child: delivery?.hasError == true
-                            ? const Center(child: Icon(Icons.broken_image))
+                            ? const Center(
+                                child: Text(
+                                  'Stamp không còn khả dụng.',
+                                  textAlign: TextAlign.center,
+                                ),
+                              )
                             : delivery?.isLoading == true
                             ? const Center(
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
                                 ),
                               )
+                            : localImagePath != null
+                            ? Image.file(
+                                File(localImagePath!),
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    const Center(
+                                      child: Text(
+                                        'Stamp không còn khả dụng.',
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                              )
                             : Image.network(
                                 resolvedImageUrl!,
                                 fit: BoxFit.cover,
                                 errorBuilder: (context, error, stackTrace) =>
                                     const Center(
-                                      child: Icon(Icons.broken_image),
+                                      child: Text(
+                                        'Stamp không còn khả dụng.',
+                                        textAlign: TextAlign.center,
+                                      ),
                                     ),
                                 loadingBuilder:
                                     (context, child, loadingProgress) {

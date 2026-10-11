@@ -2,157 +2,144 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:inkstamp/app/router/app_routes.dart';
-import 'package:inkstamp/app/theme/app_colors.dart';
-import 'package:inkstamp/app/theme/app_spacing.dart';
-import 'package:inkstamp/core/widgets/inkstamp_scaffold.dart';
-import 'package:inkstamp/core/widgets/stamp_artwork.dart';
+import 'package:inkstamp/core/widgets/editorial_ui.dart';
+import 'package:inkstamp/core/widgets/memory_photo.dart';
+import 'package:inkstamp/core/widgets/motion_feedback.dart';
 import 'package:inkstamp/core/widgets/user_avatar.dart';
-import 'package:inkstamp/features/stamps/domain/entities/stamp.dart';
-import 'package:inkstamp/features/stamps/presentation/controllers/stamp_timeline_controller.dart';
+import 'package:inkstamp/features/inbox/presentation/controllers/inbox_controller.dart';
 import 'package:intl/intl.dart';
 
-class InboxScreen extends ConsumerWidget {
+class InboxScreen extends ConsumerStatefulWidget {
   const InboxScreen({super.key});
-
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final StampTimelineState state = ref.watch(stampTimelineControllerProvider);
-
-    return InkstampScaffold(
-      title: 'Inbox',
-      actions: <Widget>[
-        IconButton(
-          tooltip: 'Settings',
-          onPressed: () => context.push(AppRoutes.settings),
-          icon: const Icon(Icons.settings_outlined),
-        ),
-      ],
-      body: state.isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : state.received.isEmpty
-          ? const _EmptyInbox()
-          : RefreshIndicator(
-              onRefresh: ref
-                  .read(stampTimelineControllerProvider.notifier)
-                  .load,
-              child: ListView.separated(
-                padding: const EdgeInsets.only(
-                  top: AppSpacing.sm,
-                  bottom: AppSpacing.xl,
-                ),
-                itemCount: state.received.length,
-                separatorBuilder: (context, index) {
-                  return const SizedBox(height: AppSpacing.md);
-                },
-                itemBuilder: (context, index) {
-                  return _InboxStampCard(stamp: state.received[index]);
-                },
-              ),
-            ),
-    );
-  }
+  ConsumerState<InboxScreen> createState() => _InboxScreenState();
 }
 
-class _InboxStampCard extends StatelessWidget {
-  const _InboxStampCard({required this.stamp});
-
-  final Stamp stamp;
+class _InboxScreenState extends ConsumerState<InboxScreen> {
+  @override
+  void initState() {
+    super.initState();
+    Future<void>.microtask(() {
+      if (mounted) ref.read(inboxControllerProvider.notifier).refresh();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.white,
-      borderRadius: BorderRadius.circular(28),
-      child: InkWell(
-        onTap: () => context.push(AppRoutes.stamp(stamp.id)),
-        borderRadius: BorderRadius.circular(28),
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: Column(
-            children: <Widget>[
-              Row(
-                children: <Widget>[
-                  UserAvatar(name: stamp.senderName),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Text(
-                          stamp.senderName,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        Text(
-                          DateFormat('HH:mm · dd/MM').format(stamp.createdAt),
-                          style: const TextStyle(
-                            color: AppColors.charcoal,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
+    final state = ref.watch(inboxControllerProvider);
+    final controller = ref.read(inboxControllerProvider.notifier);
+    return ColoredBox(
+      color: EditorialColors.canvas,
+      child: SafeArea(
+        bottom: false,
+        child: RefreshIndicator(
+          onRefresh: controller.refresh,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
+            children: [
+              EditorialHeader(
+                title: 'hộp thư',
+                trailing: IconButton(
+                  tooltip: 'Làm mới hộp thư',
+                  onPressed: controller.refresh,
+                  icon: const Icon(Icons.refresh, size: 22),
+                ),
+              ),
+              if (state.loading) const LinearProgressIndicator(minHeight: 2),
+              if (state.error != null)
+                TextButton(
+                  onPressed: controller.refresh,
+                  child: Text('${state.error} Thử lại'),
+                ),
+              if (!state.loading && state.error == null && state.items.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 48),
+                  child: Text(
+                    'Chưa có stamp mới.\nKhoảnh khắc bạn bè gửi sẽ xuất hiện ở đây.',
+                    textAlign: TextAlign.center,
                   ),
-                  if (!stamp.isSeen)
-                    Container(
-                      width: 9,
-                      height: 9,
-                      decoration: const BoxDecoration(
-                        color: AppColors.blush,
-                        shape: BoxShape.circle,
+                ),
+              for (final stamp in state.items)
+                Semantics(
+                  button: true,
+                  label:
+                      '${stamp.senderName}, ${stamp.isSeen ? "Đã đọc" : "Chưa đọc"}, '
+                      '${DateFormat('HH:mm · dd/MM').format(stamp.createdAt.toLocal())}',
+                  child: PressFeedback(
+                    child: InkWell(
+                      onTap: () => context.push(AppRoutes.stamp(stamp.id)),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        child: Row(
+                          children: [
+                            UserAvatar(name: stamp.senderName),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    stamp.senderName,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontWeight: stamp.isSeen
+                                          ? FontWeight.w400
+                                          : FontWeight.w700,
+                                    ),
+                                  ),
+                                  Text(
+                                    DateFormat(
+                                      'HH:mm · dd/MM',
+                                    ).format(stamp.createdAt.toLocal()),
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: EditorialColors.muted,
+                                    ),
+                                  ),
+                                  if (stamp.shortTitle.isNotEmpty)
+                                    Text(
+                                      stamp.shortTitle,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            if (!stamp.isSeen)
+                              const Padding(
+                                padding: EdgeInsets.only(right: 8),
+                                child: Text(
+                                  '•',
+                                  style: TextStyle(fontSize: 20),
+                                ),
+                              ),
+                            Semantics(
+                              label: 'Ảnh stamp của ${stamp.senderName}',
+                              child: SizedBox(
+                                width: 56,
+                                height: 56,
+                                child: MemoryPhoto(
+                                  publicId: stamp.cloudinaryThumbnailPublicId,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  if (stamp.reaction != null)
-                    Text(
-                      stamp.reaction!.emoji,
-                      style: const TextStyle(fontSize: 22),
-                    ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.md),
-              StampArtwork(
-                seed: stamp.seed,
-                frameStyle: stamp.frameStyle,
-                paperTone: stamp.paperTone,
-                publicId: stamp.cloudinaryThumbnailPublicId,
-                heroTag: 'stamp-${stamp.id}',
-                showShadow: false,
-              ),
+                  ),
+                ),
+              if (state.next != null)
+                TextButton(
+                  onPressed: state.loading ? null : controller.loadMore,
+                  child: const Text('Tải thêm'),
+                ),
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _EmptyInbox extends StatelessWidget {
-  const _EmptyInbox();
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          const Icon(
-            Icons.mark_email_unread_outlined,
-            size: 64,
-            color: AppColors.sky,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Text(
-            'Your Inbox is waiting for a moment',
-            style: Theme.of(context).textTheme.headlineMedium,
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          const Text(
-            'Add a friend or send your first stamp to get started.',
-            textAlign: TextAlign.center,
-          ),
-        ],
       ),
     );
   }

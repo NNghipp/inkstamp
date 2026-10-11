@@ -4,7 +4,7 @@ import 'package:http/testing.dart';
 import 'package:inkstamp/features/stamps/data/repositories/cloudinary_delivery_repository.dart';
 
 void main() {
-  test('resolves an authorized delivery URL and caches it', () async {
+  test('reauthorizes each delivery URL resolution', () async {
     var calls = 0;
     final repository = CloudinaryDeliveryRepository(
       gatewayBaseUrl: 'http://127.0.0.1:8787',
@@ -25,7 +25,7 @@ void main() {
     const publicId = 'inkstamp/user-1/stamp/id-1';
     expect(await repository.resolve(publicId), contains('cloudinary.com'));
     expect(await repository.resolve(publicId), contains('cloudinary.com'));
-    expect(calls, 1);
+    expect(calls, 2);
   });
 
   test('rejects unauthorized delivery responses', () async {

@@ -1,16 +1,17 @@
-import { createRemoteJWKSet, jwtVerify } from "jose";
+import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from "jose";
 
 const appCheckKeys = createRemoteJWKSet(
   new URL("https://firebaseappcheck.googleapis.com/v1/jwks"),
 );
 
 export class FirebaseAppCheckVerifier {
+  constructor(private readonly keys: JWTVerifyGetKey = appCheckKeys) {}
   async verify({
     appCheckHeader,
-    projectId,
+    projectNumber,
   }: {
     appCheckHeader: string | null;
-    projectId: string;
+    projectNumber: string;
   }): Promise<void> {
     if (appCheckHeader === null || appCheckHeader.length === 0) {
       throw new InvalidAppCheckError("App Check token is missing.");
@@ -20,14 +21,15 @@ export class FirebaseAppCheckVerifier {
     }
 
     try {
-      const { payload } = await jwtVerify(appCheckHeader, appCheckKeys, {
+      const { payload, protectedHeader } = await jwtVerify(appCheckHeader, this.keys, {
         algorithms: ["RS256"],
-        audience: [`projects/${projectId}`],
+        audience: [`projects/${projectNumber}`],
+        issuer: `https://firebaseappcheck.googleapis.com/${projectNumber}`,
       });
 
       if (
-        typeof payload.iss !== "string" ||
-        !payload.iss.startsWith("https://firebaseappcheck.googleapis.com/")
+        protectedHeader.typ !== "JWT" || typeof payload.exp !== "number" ||
+        typeof payload.sub !== "string" || payload.sub.length === 0
       ) {
         throw new InvalidAppCheckError("Invalid App Check token issuer.");
       }
@@ -36,7 +38,7 @@ export class FirebaseAppCheckVerifier {
         throw error;
       }
       throw new InvalidAppCheckError(
-        error instanceof Error ? error.message : "App Check validation failed.",
+        "App Check validation failed.",
       );
     }
   }

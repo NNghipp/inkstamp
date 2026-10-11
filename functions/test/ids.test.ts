@@ -16,6 +16,10 @@ describe("normalizeUsername", () => {
   it("normalizes case and whitespace", () => {
     expect(normalizeUsername("  Mai.Paper  ")).toBe("mai.paper");
   });
+
+  it("preserves the username characters accepted by validation", () => {
+    expect(normalizeUsername("  NEW_user.26 ")).toBe("new_user.26");
+  });
 });
 
 describe("utcDayKey", () => {
