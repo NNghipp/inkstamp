@@ -37,8 +37,7 @@ và lưu giữ chúng trong lịch hoặc bộ sưu tập cá nhân.
   </p>
 </details>
 
-Ảnh chụp thật từ ứng dụng Android DEV ngày 15/10/2026. Camera đang dùng ảnh mẫu DEV;
-Calendar hiển thị phần ngày được chọn sau khi cuộn.
+
 
 ## Công nghệ
 
