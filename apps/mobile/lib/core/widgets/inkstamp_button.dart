@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:inkstamp/app/theme/app_colors.dart';
+
 import 'package:inkstamp/app/theme/app_spacing.dart';
 
 class InkstampButton extends StatelessWidget {
@@ -20,11 +20,12 @@ class InkstampButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     final ButtonStyle style = FilledButton.styleFrom(
       minimumSize: const Size.fromHeight(56),
-      foregroundColor: isSecondary ? AppColors.ink : AppColors.white,
-      backgroundColor: isSecondary ? AppColors.white : AppColors.ink,
-      disabledBackgroundColor: AppColors.mist,
+      foregroundColor: isSecondary ? colors.onSurface : colors.onPrimary,
+      backgroundColor: isSecondary ? colors.surfaceContainer : colors.primary,
+      disabledBackgroundColor: colors.surfaceContainer,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
     );
 

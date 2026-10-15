@@ -71,7 +71,7 @@ void main() {
         ],
         child: MaterialApp.router(
           debugShowCheckedModeBanner: false,
-          theme: AppTheme.light,
+          theme: AppTheme.dark,
           routerConfig: router,
         ),
       ),
@@ -80,6 +80,14 @@ void main() {
       final BuildContext context = tester.element(find.byType(MaterialApp));
       for (final String asset in _visualAssets) {
         await precacheImage(AssetImage(asset), context);
+        await precacheImage(
+          ResizeImage(AssetImage(asset), width: 512),
+          context,
+        );
+        await precacheImage(
+          ResizeImage(AssetImage(asset), width: 1440),
+          context,
+        );
       }
     });
     await tester.pump();
@@ -145,7 +153,7 @@ void main() {
       ProviderScope(
         child: MaterialApp(
           debugShowCheckedModeBanner: false,
-          theme: AppTheme.light,
+          theme: AppTheme.dark,
           home: const StampPreviewScreen(designPreview: true),
         ),
       ),

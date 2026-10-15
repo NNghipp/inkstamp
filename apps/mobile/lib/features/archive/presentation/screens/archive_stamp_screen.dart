@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:inkstamp/app/theme/app_colors.dart';
 import 'package:inkstamp/app/theme/app_spacing.dart';
 import 'package:inkstamp/core/widgets/inkstamp_scaffold.dart';
 import 'package:inkstamp/core/widgets/stamp_artwork.dart';
@@ -34,6 +33,7 @@ class ArchiveStampScreen extends ConsumerWidget {
                     frameStyle: stamp.frameStyle,
                     paperTone: stamp.paperTone,
                     publicId: stamp.cloudinaryPublicId,
+                    capturedAt: stamp.captureTime,
                   ),
                 ),
                 const SizedBox(height: AppSpacing.xl),
@@ -43,9 +43,15 @@ class ArchiveStampScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
-                  DateFormat('HH:mm · dd/MM/yyyy').format(stamp.createdAt),
-                  style: const TextStyle(color: AppColors.charcoal),
+                  DateFormat(
+                    'HH:mm · dd/MM/yyyy',
+                  ).format(stamp.captureTime.toLocal()),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
+                if (stamp.shortTitle.isNotEmpty) Text(stamp.shortTitle),
+                if (stamp.locationLabel != null) Text(stamp.locationLabel!),
                 if (stamp.reaction != null) ...<Widget>[
                   const SizedBox(height: AppSpacing.md),
                   Text(

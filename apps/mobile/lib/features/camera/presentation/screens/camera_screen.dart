@@ -8,9 +8,11 @@ import 'package:go_router/go_router.dart';
 import 'package:inkstamp/app/router/app_routes.dart';
 import 'package:inkstamp/app/theme/app_motion.dart';
 import 'package:inkstamp/core/widgets/editorial_ui.dart';
+import 'package:inkstamp/core/widgets/memory_photo.dart';
 import 'package:inkstamp/core/widgets/motion_feedback.dart';
 import 'package:inkstamp/features/camera/data/repositories/dev_asset_capture_source.dart';
 import 'package:inkstamp/features/camera/presentation/controllers/camera_controller.dart';
+import 'package:inkstamp/features/stamps/presentation/controllers/stamp_timeline_controller.dart';
 
 class CameraScreen extends ConsumerStatefulWidget {
   const CameraScreen({this.initializeCamera = true, super.key});
@@ -33,6 +35,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   int _focusRevision = 0;
   bool _navigating = false;
   bool _choosingSample = false;
+  String? _sampleAsset;
   bool _focusVisible = false;
   bool _showGrid = false;
   double _lensTurns = 0;
@@ -76,7 +79,12 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     }
     _navigating = true;
     try {
-      await _openCapturedPreview(await _controller.capture());
+      final sample = devAssetCaptureEnabled ? _sampleAsset : null;
+      await _openCapturedPreview(
+        sample == null
+            ? await _controller.capture()
+            : await _controller.captureDevAsset(sample),
+      );
     } finally {
       _navigating = false;
     }
@@ -88,7 +96,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     try {
       final images = await ref.read(devAssetCaptureSourceProvider).listImages();
       if (!mounted) return;
-      if (images.isEmpty) {
+      if (images.isEmpty && _sampleAsset == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('No supported images in assets/image_test/.'),
@@ -103,6 +111,11 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
             mainAxisSize: MainAxisSize.min,
             children: [
               const ListTile(title: Text('DEV sample capture')),
+              ListTile(
+                leading: const Icon(Icons.photo_camera_outlined),
+                title: const Text('Camera thật'),
+                onTap: () => Navigator.pop(context, ''),
+              ),
               Flexible(
                 child: ListView.builder(
                   shrinkWrap: true,
@@ -119,8 +132,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
         ),
       );
       if (selected == null || !mounted) return;
-      _navigating = true;
-      await _openCapturedPreview(await _controller.captureDevAsset(selected));
+      setState(() => _sampleAsset = selected.isEmpty ? null : selected);
     } on Object {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -144,6 +156,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   }
 
   Future<void> _focus(TapDownDetails details, Size size) async {
+    if (devAssetCaptureEnabled && _sampleAsset != null) return;
     final point = details.localPosition;
     final supported = await _controller.focusAt(
       Offset(
@@ -192,6 +205,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
               state: state,
               zoom: _zoom,
               designPreview: !widget.initializeCamera,
+              sampleAsset: devAssetCaptureEnabled ? _sampleAsset : null,
             ),
           ),
           const _CameraShade(),
@@ -258,6 +272,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
                           tooltip: 'DEV sample capture',
                           icon: Icons.image_outlined,
                           onPressed: state.isBusy ? null : _chooseSample,
+                          active: _sampleAsset != null,
                         ),
                         const SizedBox(width: 8),
                       ],
@@ -338,7 +353,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: <Widget>[
-                      const _RecentStamp(),
+                      _RecentStamp(designPreview: !widget.initializeCamera),
                       PressFeedback(
                         enabled: state.phase == CameraPhase.ready,
                         child: _Shutter(
@@ -380,16 +395,32 @@ class _CameraFeed extends StatelessWidget {
     required this.state,
     required this.zoom,
     this.designPreview = false,
+    this.sampleAsset,
   });
   final CameraControllerState state;
   final double zoom;
   final bool designPreview;
+  final String? sampleAsset;
 
   @override
   Widget build(BuildContext context) {
     final Object? handle = state.previewHandle;
     final Widget feed;
-    if (handle is camera.CameraController && handle.value.isInitialized) {
+    if (devAssetCaptureEnabled && sampleAsset != null) {
+      feed = Image.asset(
+        sampleAsset!,
+        key: const ValueKey('dev-camera-static-preview'),
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => const Center(
+          child: Text(
+            'Không đọc được ảnh. Chọn ảnh khác hoặc Camera thật.',
+            style: TextStyle(color: Colors.white),
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+    } else if (handle is camera.CameraController &&
+        handle.value.isInitialized) {
       final portrait =
           MediaQuery.orientationOf(context) == Orientation.portrait;
       final size = handle.value.previewSize!;
@@ -779,10 +810,40 @@ class _ZoomSelector extends StatelessWidget {
   }
 }
 
-class _RecentStamp extends StatelessWidget {
-  const _RecentStamp();
+class _RecentStamp extends ConsumerWidget {
+  const _RecentStamp({this.designPreview = false});
+  final bool designPreview;
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (!designPreview) {
+      final memories = ref.watch(stampTimelineControllerProvider).sent;
+      final latest = memories.isEmpty ? null : memories.first;
+      return SizedBox(
+        width: 45,
+        height: 60,
+        child: Center(
+          child: latest == null
+              ? const Icon(
+                  Icons.photo_outlined,
+                  color: Colors.white54,
+                  size: 26,
+                )
+              : Semantics(
+                  label: 'Ký ức mới nhất',
+                  child: GestureDetector(
+                    onTap: () => context.push(AppRoutes.stamp(latest.id)),
+                    child: SizedBox.square(
+                      dimension: 45,
+                      child: MemoryPhoto(
+                        publicId: latest.cloudinaryThumbnailPublicId,
+                        decodeSize: 512,
+                      ),
+                    ),
+                  ),
+                ),
+        ),
+      );
+    }
     return Container(
       width: 45,
       height: 60,
@@ -796,7 +857,11 @@ class _RecentStamp extends StatelessWidget {
           const SizedBox(height: 2),
           const Text(
             '#141',
-            style: TextStyle(fontSize: 8, fontWeight: FontWeight.w700),
+            style: TextStyle(
+              color: Color(0xFF1A1C1B),
+              fontSize: 8,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ],
       ),

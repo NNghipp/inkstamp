@@ -3,11 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:inkstamp/app/router/app_routes.dart';
 import 'package:inkstamp/app/theme/app_motion.dart';
-import 'package:inkstamp/core/images/stamp_image_format.dart';
+import 'package:inkstamp/app/theme/gallery_tokens.dart';
 import 'package:inkstamp/core/widgets/editorial_ui.dart';
 import 'package:inkstamp/core/widgets/memory_photo.dart';
 import 'package:inkstamp/core/widgets/motion_feedback.dart';
+import 'package:inkstamp/core/widgets/user_avatar.dart';
 import 'package:inkstamp/features/archive/presentation/controllers/memory_view_controller.dart';
+import 'package:inkstamp/features/authentication/presentation/controllers/session_controller.dart';
 import 'package:inkstamp/features/stamps/domain/entities/stamp.dart';
 import 'package:intl/intl.dart';
 
@@ -34,12 +36,27 @@ class CalendarScreen extends ConsumerWidget {
       child: SafeArea(
         bottom: false,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
+          padding: EdgeInsets.fromLTRB(
+            MediaQuery.sizeOf(context).width < 348 ? 6 : 20,
+            4,
+            MediaQuery.sizeOf(context).width < 348 ? 6 : 20,
+            28,
+          ),
           key: const PageStorageKey('calendar-scroll'),
           children: <Widget>[
-            const EditorialHeader(
+            EditorialHeader(
               title: 'lịch',
-              trailing: EditorialAvatar(size: 32),
+              trailing: designPreview
+                  ? const EditorialAvatar(size: 32)
+                  : UserAvatar(
+                      name:
+                          ref
+                              .watch(sessionControllerProvider)
+                              .user
+                              ?.displayName ??
+                          'InkStamp',
+                      size: 32,
+                    ),
             ),
             const SizedBox(height: 18),
             _MonthHeading(
@@ -134,9 +151,9 @@ class CalendarScreen extends ConsumerWidget {
                               : stamp.shortTitle,
                           time: DateFormat(
                             'HH:mm',
-                          ).format(stamp.createdAt.toLocal()),
+                          ).format(stamp.captureTime.toLocal()),
                           note: '',
-                          date: stamp.createdAt.toLocal(),
+                          date: stamp.captureTime.toLocal(),
                           onTap: () => context.push(AppRoutes.stamp(stamp.id)),
                         ),
                       ),
@@ -204,9 +221,7 @@ class _MonthHeading extends StatelessWidget {
               ),
               const SizedBox(height: 2),
               TechnicalText(
-                month == null
-                    ? 'TẬP TEM KỶ NIỆM · KHO LƯU TRỮ · 14 TEM ĐÃ\nPHÁT HÀNH'
-                    : 'TẬP TEM KỶ NIỆM · KHO LƯU TRỮ · $count TEM',
+                month == null ? '14 tem kỷ niệm' : '$count tem kỷ niệm',
                 fontSize: 10,
                 letterSpacing: 0.8,
               ),
@@ -340,9 +355,10 @@ class _CalendarGrid extends StatelessWidget {
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 7,
-            mainAxisExtent: 56,
+            mainAxisExtent:
+                44 + MediaQuery.textScalerOf(context).scale(13) * 1.55,
           ),
           itemCount: month == null
               ? _days.length
@@ -370,10 +386,13 @@ class _CalendarGrid extends StatelessWidget {
                 label:
                     '${DateFormat('dd/MM/yyyy').format(date)}, ${items.length} khoảnh khắc',
                 child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
                   onTap: () => onSelected?.call(date),
                   child: AnimatedContainer(
                     duration: AppMotion.duration(context, AppMotion.fast),
                     decoration: BoxDecoration(
+                      color: isSelected ? GalleryTokens.glass : null,
+                      borderRadius: BorderRadius.circular(8),
                       border: isSelected
                           ? Border.all(color: EditorialColors.ink, width: 1.5)
                           : null,
@@ -383,20 +402,21 @@ class _CalendarGrid extends StatelessWidget {
                       children: <Widget>[
                         if (items.isNotEmpty)
                           SizedBox(
-                            width: 21,
-                            height: 21,
+                            width: 28,
+                            height: 28,
                             child: MemoryPhoto(
                               publicId: items.first.cloudinaryThumbnailPublicId,
+                              decodeSize: 512,
                             ),
                           ),
                         Text(
                           items.length > 1
-                              ? '${date.day} · ${items.length}'
+                              ? '${date.day} +${items.length - 1}'
                               : '${date.day}',
                           style: TextStyle(
-                            fontSize: items.isEmpty ? 12 : 7,
+                            fontSize: items.isEmpty ? 12 : 10,
                             color: outside
-                                ? const Color(0xFFD4D4CE)
+                                ? const Color(0xFF747570)
                                 : EditorialColors.ink,
                           ),
                         ),
@@ -427,7 +447,7 @@ class _CalendarGrid extends StatelessWidget {
                 '$day',
                 style: TextStyle(
                   color: outside
-                      ? const Color(0xFFD4D4CE)
+                      ? const Color(0xFF747570)
                       : EditorialColors.ink,
                   fontSize: 12,
                   fontWeight: FontWeight.w400,
@@ -521,21 +541,21 @@ class _DayHeading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: <Widget>[
+    return Wrap(
+      spacing: 8,
+      runSpacing: 4,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
         Text(
           date == null
               ? (designPreview ? '26 Tháng 9, 2026' : 'Chọn ngày')
               : '${date!.day} Tháng ${date!.month}, ${date!.year}',
-          style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w600),
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
         ),
-        const SizedBox(width: 8),
         Text(
           '·  ${designPreview ? 2 : count} khoảnh khắc',
           style: const TextStyle(color: EditorialColors.muted, fontSize: 12),
         ),
-        const Spacer(),
-        if (designPreview) const TechnicalText('HÀ NỘI', fontSize: 9),
       ],
     );
   }
@@ -566,117 +586,53 @@ class _ArchiveEntry extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: DecoratedBox(
-              decoration: isProcessedStampImage(publicId)
-                  ? const BoxDecoration()
-                  : BoxDecoration(
-                      color: Colors.white,
-                      border: Border.all(color: const Color(0xFFD9D9D3)),
-                    ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 18,
-                ),
-                child: Column(
-                  children: <Widget>[
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        const Padding(
-                          padding: EdgeInsets.only(top: 7),
-                          child: SizedBox.square(
-                            dimension: 5,
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(
-                                color: Colors.black,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 7),
-                        Expanded(
-                          child: TechnicalText(
-                            'INKSTAMP · TEM #$stampNumber · HN-026',
-                            color: EditorialColors.ink,
-                            fontSize: 9,
-                            maxLines: 2,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        TechnicalText(
-                          date == null
-                              ? '26.09.2026 · HÀ\nNỘI'
-                              : DateFormat('dd.MM.yyyy').format(date!),
-                          fontSize: 9,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    const Divider(height: 1, color: EditorialColors.line),
-                    const SizedBox(height: 14),
-                    AspectRatio(
-                      aspectRatio: 1,
-                      child: MemoryPhoto(asset: image, publicId: publicId),
-                    ),
-                    const SizedBox(height: 14),
-                    Row(
-                      children: <Widget>[
-                        const TechnicalText(
-                          'VẬT THỂ TEM PHÁT HÀNH',
-                          fontSize: 9,
-                        ),
-                        const Spacer(),
-                        TechnicalText(lens, fontSize: 9, letterSpacing: 0.2),
-                      ],
-                    ),
-                  ],
+    return Semantics(
+      button: onTap != null,
+      label: '$title, $time',
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AspectRatio(
+                aspectRatio: 1,
+                child: MemoryPhoto(
+                  capturedAt: date,
+                  asset: image,
+                  publicId: publicId,
+                  decodeSize: 512,
                 ),
               ),
-            ),
-          ),
-          const SizedBox(height: 27),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: <Widget>[
-              ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: MediaQuery.sizeOf(context).width * .5,
-                ),
-                child: Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 19,
-                    fontWeight: FontWeight.w500,
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 12),
+                  Text(
+                    time,
+                    style: const TextStyle(
+                      color: GalleryTokens.secondaryText,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 8),
-              TechnicalText(time, fontSize: 10, letterSpacing: 0.2),
-              const Spacer(),
-              const TechnicalText('HÀ NỘI', fontSize: 9),
             ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            note,
-            style: const TextStyle(
-              color: Color(0xFF62625D),
-              fontSize: 14,
-              height: 1.55,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

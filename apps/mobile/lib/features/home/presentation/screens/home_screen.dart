@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:inkstamp/app/router/app_routes.dart';
-import 'package:inkstamp/core/images/stamp_image_format.dart';
+import 'package:inkstamp/app/theme/gallery_tokens.dart';
 import 'package:inkstamp/core/widgets/editorial_ui.dart';
 import 'package:inkstamp/core/widgets/memory_photo.dart';
 import 'package:inkstamp/features/archive/presentation/controllers/memory_view_controller.dart';
@@ -55,12 +55,13 @@ class HomeScreen extends ConsumerWidget {
               for (final stamp in memories) ...<Widget>[
                 _MomentCard(
                   publicId: stamp.cloudinaryPublicId,
-                  time: DateFormat('HH:mm').format(stamp.createdAt.toLocal()),
+                  capturedAt: stamp.captureTime,
+                  time: DateFormat('HH:mm').format(stamp.captureTime.toLocal()),
                   person: stamp.senderName,
                   caption: stamp.shortTitle,
                   onTap: () => context.push(AppRoutes.stamp(stamp.id)),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
               ],
             ] else ...const <Widget>[
               _MomentCard(
@@ -69,14 +70,14 @@ class HomeScreen extends ConsumerWidget {
                 person: 'Lan',
                 caption: 'Nắng sớm ngõ nhỏ',
               ),
-              SizedBox(height: 24),
+              SizedBox(height: 20),
               _MomentCard(
                 image: EditorialAssets.cafeFriends,
                 time: '17:15',
                 person: 'Minh',
                 caption: 'Cà phê chiều cùng Minh',
               ),
-              SizedBox(height: 24),
+              SizedBox(height: 20),
               _MomentCard(
                 image: EditorialAssets.street,
                 time: '19:45',
@@ -96,40 +97,9 @@ class _FeedLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const SizedBox(
-      width: double.infinity,
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        alignment: Alignment.centerLeft,
-        child: SizedBox(
-          width: 470,
-          child: Row(
-            children: <Widget>[
-              TechnicalText('BẢN TIN THỊ GIÁC', fontSize: 11),
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 9),
-                child: Text('/', style: TextStyle(color: Color(0xFFB1B1AB))),
-              ),
-              Text(
-                'Hôm nay',
-                style: TextStyle(
-                  color: EditorialColors.muted,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              Spacer(),
-              Icon(
-                Icons.filter_vintage_outlined,
-                size: 15,
-                color: Color(0xFF6B6C67),
-              ),
-              SizedBox(width: 6),
-              TechnicalText('CUỘN TEM 35MM', fontSize: 10),
-            ],
-          ),
-        ),
-      ),
+    return const Text(
+      'Những khoảnh khắc được giữ lại.',
+      style: TextStyle(color: GalleryTokens.secondaryText, fontSize: 12),
     );
   }
 }
@@ -139,6 +109,7 @@ class _MomentCard extends StatelessWidget {
     this.image,
     this.publicId,
     this.onTap,
+    this.capturedAt,
     required this.time,
     required this.person,
     required this.caption,
@@ -147,6 +118,7 @@ class _MomentCard extends StatelessWidget {
   final String? image;
   final String? publicId;
   final VoidCallback? onTap;
+  final DateTime? capturedAt;
   final String time;
   final String person;
   final String caption;
@@ -159,19 +131,7 @@ class _MomentCard extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap,
         child: DecoratedBox(
-          decoration: isProcessedStampImage(publicId)
-              ? const BoxDecoration()
-              : BoxDecoration(
-                  color: Colors.white,
-                  border: Border.all(color: const Color(0xFFE2E2DD)),
-                  boxShadow: const <BoxShadow>[
-                    BoxShadow(
-                      color: Color(0x10000000),
-                      blurRadius: 7,
-                      offset: Offset(0, 2),
-                    ),
-                  ],
-                ),
+          decoration: const BoxDecoration(),
           child: Padding(
             padding: const EdgeInsets.all(10),
             child: AspectRatio(
@@ -179,16 +139,25 @@ class _MomentCard extends StatelessWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: <Widget>[
-                  MemoryPhoto(asset: image, publicId: publicId),
+                  MemoryPhoto(
+                    asset: image,
+                    publicId: publicId,
+                    capturedAt: capturedAt,
+                  ),
                   Positioned(top: 10, left: 10, child: _PhotoTag(label: time)),
                   Positioned(
                     top: 10,
                     right: 10,
-                    child: _PhotoTag(label: person),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: MediaQuery.sizeOf(context).width * .40,
+                      ),
+                      child: _PhotoTag(label: person),
+                    ),
                   ),
                   if (caption.isNotEmpty)
                     Positioned(
-                      bottom: 10,
+                      bottom: capturedAt == null ? 10 : 46,
                       left: 10,
                       right: 10,
                       child: Align(
@@ -216,14 +185,11 @@ class _PhotoTag extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xC936352F),
-        borderRadius: BorderRadius.circular(14),
+        color: GalleryTokens.overlay,
+        borderRadius: BorderRadius.circular(6),
       ),
       child: Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: large ? 11 : 10,
-          vertical: large ? 5 : 4,
-        ),
+        padding: EdgeInsets.symmetric(horizontal: large ? 9 : 8, vertical: 6),
         child: Text(
           label,
           maxLines: 1,

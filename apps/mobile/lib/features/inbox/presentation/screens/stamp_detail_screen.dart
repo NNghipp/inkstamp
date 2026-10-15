@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:inkstamp/app/router/app_routes.dart';
-import 'package:inkstamp/app/theme/app_colors.dart';
 import 'package:inkstamp/app/theme/app_spacing.dart';
+import 'package:inkstamp/app/theme/gallery_tokens.dart';
 import 'package:inkstamp/core/widgets/inkstamp_button.dart';
 import 'package:inkstamp/core/widgets/inkstamp_scaffold.dart';
 import 'package:inkstamp/core/widgets/stamp_artwork.dart';
@@ -66,7 +66,7 @@ class _StampDetailScreenState extends ConsumerState<StampDetailScreen> {
     }
 
     return InkstampScaffold(
-      title: stamp.senderName,
+      title: 'Ký ức',
       actions: <Widget>[
         PopupMenuButton<String>(
           onSelected: (String value) {
@@ -89,23 +89,27 @@ class _StampDetailScreenState extends ConsumerState<StampDetailScreen> {
             children: <Widget>[
               UserAvatar(name: stamp.senderName),
               const SizedBox(width: AppSpacing.sm),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    stamp.senderName,
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  Text(
-                    DateFormat(
-                      'HH:mm · dd/MM/yyyy',
-                    ).format(stamp.createdAt.toLocal()),
-                    style: const TextStyle(
-                      color: AppColors.charcoal,
-                      fontSize: 12,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      stamp.senderName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w500),
                     ),
-                  ),
-                ],
+                    Text(
+                      DateFormat(
+                        'HH:mm · dd/MM/yyyy',
+                      ).format(stamp.captureTime.toLocal()),
+                      style: const TextStyle(
+                        color: GalleryTokens.secondaryText,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -122,6 +126,7 @@ class _StampDetailScreenState extends ConsumerState<StampDetailScreen> {
                     frameStyle: stamp.frameStyle,
                     paperTone: stamp.paperTone,
                     publicId: stamp.cloudinaryPublicId,
+                    capturedAt: stamp.captureTime,
                   ),
                 ),
               ),
@@ -132,6 +137,14 @@ class _StampDetailScreenState extends ConsumerState<StampDetailScreen> {
               stamp.shortTitle,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
+            ),
+          if (stamp.locationLabel != null)
+            Text(
+              stamp.locationLabel!,
+              style: const TextStyle(
+                color: GalleryTokens.secondaryText,
+                fontSize: 12,
+              ),
             ),
           ReactionBar(
             selected: stamp.reaction,

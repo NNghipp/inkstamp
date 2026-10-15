@@ -375,7 +375,7 @@ void main() {
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
-        child: MaterialApp.router(theme: AppTheme.light, routerConfig: router),
+        child: MaterialApp.router(theme: AppTheme.dark, routerConfig: router),
       ),
     );
     await tester.pumpAndSettle();

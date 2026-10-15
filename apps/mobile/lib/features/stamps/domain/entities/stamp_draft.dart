@@ -12,6 +12,9 @@ class StampDraft {
     this.localThumbnailPath,
     this.cloudinaryPublicId,
     this.cloudinaryThumbnailPublicId,
+    this.capturedAt,
+    this.title,
+    this.locationLabel,
   });
 
   factory StampDraft.initial() {
@@ -24,6 +27,11 @@ class StampDraft {
   }
 
   final int seed;
+  final DateTime? capturedAt;
+  final String? title;
+  final String? locationLabel;
+  DateTime get captureTime =>
+      capturedAt ?? DateTime.fromMillisecondsSinceEpoch(seed);
   final StampFrameStyle frameStyle;
   final PaperTone paperTone;
   final AudienceMode audience;
@@ -36,6 +44,9 @@ class StampDraft {
 
   StampDraft copyWith({
     int? seed,
+    DateTime? capturedAt,
+    String? title,
+    String? locationLabel,
     StampFrameStyle? frameStyle,
     PaperTone? paperTone,
     AudienceMode? audience,
@@ -50,6 +61,9 @@ class StampDraft {
   }) {
     return StampDraft(
       seed: seed ?? this.seed,
+      capturedAt: capturedAt ?? this.capturedAt,
+      title: title ?? this.title,
+      locationLabel: locationLabel ?? this.locationLabel,
       frameStyle: frameStyle ?? this.frameStyle,
       paperTone: paperTone ?? this.paperTone,
       audience: audience ?? this.audience,

@@ -20,6 +20,7 @@ import 'package:inkstamp/features/authentication/domain/dev_auth_policy.dart';
 import 'package:inkstamp/features/authentication/presentation/controllers/session_controller.dart';
 import 'package:inkstamp/features/camera/data/repositories/dev_asset_capture_source.dart';
 import 'package:inkstamp/features/camera/presentation/controllers/camera_controller.dart';
+import 'package:inkstamp/features/camera/presentation/screens/camera_screen.dart';
 import 'package:inkstamp/features/friends/data/repositories/firebase_friend_repository.dart';
 import 'package:inkstamp/features/friends/presentation/controllers/friends_controller.dart';
 import 'package:inkstamp/features/home/presentation/screens/home_screen.dart';
@@ -97,6 +98,10 @@ void main() {
 
     final created = <Stamp>[];
     const stampEdges = bool.fromEnvironment('STAMP_EDGES_REVIEW');
+    const readmeReview = bool.fromEnvironment('README_PRESENTATION');
+    bool isNetworkPhoto(ImageProvider provider) =>
+        provider is NetworkImage ||
+        (provider is ResizeImage && isNetworkPhoto(provider.imageProvider));
     Future<void> decodedPhotos(String name) async {
       final screen = name.startsWith('detail')
           ? find.byType(StampDetailScreen)
@@ -106,6 +111,8 @@ void main() {
           ? find.byType(SettingsScreen)
           : name == 'calendar'
           ? find.byType(CalendarScreen)
+          : name.startsWith('camera')
+          ? find.byType(CameraScreen)
           : find.byType(InboxScreen);
       await waitFor(
         () => screen.evaluate().length == 1,
@@ -139,7 +146,7 @@ void main() {
       final images = find.descendant(of: screen, matching: find.byType(Image));
       await waitFor(
         () => images.evaluate().any(
-          (e) => (e.widget as Image).image is NetworkImage,
+          (e) => isNetworkPhoto((e.widget as Image).image),
         ),
         'network image widgets',
       );
@@ -148,7 +155,7 @@ void main() {
       var failed = false;
       for (final element in images.evaluate()) {
         final widget = element.widget as Image;
-        if (widget.image is! NetworkImage) continue;
+        if (!isNetworkPhoto(widget.image)) continue;
         final stream = widget.image.resolve(
           createLocalImageConfiguration(element),
         );
@@ -215,6 +222,28 @@ void main() {
             .listImages();
         expect(assets, isNotEmpty);
         for (final asset in assets) {
+          final metadata = await container
+              .read(devAssetCaptureSourceProvider)
+              .metadata(asset);
+          if (readmeReview && metadata.title == null) {
+            continue;
+          }
+          if (readmeReview) {
+            final existing = container
+                .read(stampTimelineControllerProvider)
+                .sent
+                .where(
+                  (stamp) =>
+                      stamp.title == metadata.title &&
+                      stamp.capturedAt == metadata.capturedAt &&
+                      stamp.locationLabel == metadata.locationLabel,
+                );
+            if (existing.isNotEmpty) {
+              created.add(existing.first);
+              debugPrint('BACKEND_STEP PHOTO_REUSED_${existing.first.id}');
+              continue;
+            }
+          }
           router.go(AppRoutes.camera);
           await waitFor(
             () =>
@@ -224,7 +253,35 @@ void main() {
           );
           await tester.tap(find.byTooltip('DEV sample capture'));
           await tester.pump(const Duration(milliseconds: 500));
+          await tester.scrollUntilVisible(
+            find.text(asset.split('/').last),
+            100,
+            scrollable: find
+                .descendant(
+                  of: find.byType(BottomSheet),
+                  matching: find.byType(Scrollable),
+                )
+                .last,
+          );
+          await tester.pump(const Duration(milliseconds: 500));
           await tester.tap(find.text(asset.split('/').last));
+          await waitFor(
+            () => find
+                .byKey(const ValueKey('dev-camera-static-preview'))
+                .evaluate()
+                .isNotEmpty,
+            'static preview for ${asset.split('/').last}',
+          );
+          await tester.pump(const Duration(milliseconds: 800));
+          expect(find.byType(StampPreviewScreen), findsNothing);
+          expect(
+            find.byKey(const ValueKey('dev-camera-static-preview')),
+            findsOneWidget,
+          );
+          if (readmeReview && created.isEmpty) {
+            await screenshot('camera-sample', networkPhotos: false);
+          }
+          await tester.tap(find.bySemanticsLabel('Chụp ảnh'));
           await waitFor(
             () => find.byType(StampPreviewScreen).evaluate().isNotEmpty,
             'sample Preview',
@@ -245,6 +302,9 @@ void main() {
             'preview-${asset.split('/').last.split('.').first}',
             networkPhotos: false,
           );
+          if (readmeReview && created.isEmpty) {
+            await screenshot('preview-stamp', networkPhotos: false);
+          }
           final chip = find.byWidgetPredicate(
             (w) =>
                 w is Semantics &&
@@ -274,11 +334,82 @@ void main() {
               .sent
               .singleWhere((s) => s.seed == draft.seed);
           created.add(stamp);
+          if (readmeReview) {
+            final saved = await container
+                .read(stampRepositoryProvider)
+                .getById(stamp.id);
+            expect(saved!.title, draft.title);
+            expect(saved.locationLabel, draft.locationLabel);
+            expect(saved.capturedAt!.toUtc(), draft.capturedAt!.toUtc());
+            debugPrint(
+              'BACKEND_STEP SAMPLE_METADATA ${jsonEncode({'asset': asset.split('/').last, 'title': saved.title, 'locationLabel': saved.locationLabel, 'capturedAt': saved.capturedAt!.toLocal().toIso8601String(), 'publishedAt': saved.publishedAt.toUtc().toIso8601String()})}',
+            );
+          }
           debugPrint(
             'BACKEND_STEP PHOTO_PUBLISHED_${asset.split('/').last}_${stamp.id}',
           );
         }
+        if (readmeReview) {
+          // Re-capture after publishing so the latest-stamp thumbnail is real,
+          // and retrying a screenshot run never duplicates existing memories.
+          router.go(AppRoutes.camera);
+          await waitFor(
+            () =>
+                container.read(cameraControllerProvider).phase ==
+                CameraPhase.ready,
+            'README camera ready',
+          );
+          String? cover;
+          for (final asset in assets) {
+            if ((await container
+                        .read(devAssetCaptureSourceProvider)
+                        .metadata(asset))
+                    .title !=
+                null) {
+              cover = asset;
+              break;
+            }
+          }
+          await tester.tap(find.byTooltip('DEV sample capture'));
+          await tester.pump(const Duration(milliseconds: 500));
+          await tester.scrollUntilVisible(
+            find.text(cover!.split('/').last),
+            100,
+            scrollable: find
+                .descendant(
+                  of: find.byType(BottomSheet),
+                  matching: find.byType(Scrollable),
+                )
+                .last,
+          );
+          await tester.pump(const Duration(milliseconds: 500));
+          await tester.tap(find.text(cover.split('/').last));
+          await tester.pump(const Duration(seconds: 1));
+          await screenshot('camera-sample');
+          await tester.tap(find.bySemanticsLabel('Chụp ảnh'));
+          await waitFor(
+            () => find.byType(StampPreviewScreen).evaluate().isNotEmpty,
+            'README preview',
+          );
+          await screenshot('preview-stamp', networkPhotos: false);
+          await tester.tap(find.bySemanticsLabel('Hủy ảnh'));
+          await waitFor(
+            () =>
+                find.byType(StampPreviewScreen).evaluate().isEmpty &&
+                container.read(cameraControllerProvider).phase ==
+                    CameraPhase.ready,
+            'README discard',
+          );
+        }
         // Native shutter uses the same processor. Stamp-edge review also publishes it.
+        await tester.tap(find.byTooltip('DEV sample capture'));
+        await tester.pump(const Duration(milliseconds: 500));
+        await tester.tap(find.text('Camera thật'));
+        await tester.pump(const Duration(milliseconds: 500));
+        expect(
+          find.byKey(const ValueKey('dev-camera-static-preview')),
+          findsNothing,
+        );
         await waitFor(
           () =>
               container.read(cameraControllerProvider).phase ==
@@ -291,7 +422,7 @@ void main() {
           'native capture Preview',
         );
         await screenshot('native-camera-preview', networkPhotos: false);
-        if (stampEdges) {
+        if (stampEdges && !readmeReview) {
           final draft = container.read(stampComposerControllerProvider);
           final full = image.decodePng(
             await File(draft.localImagePath!).readAsBytes(),
@@ -355,12 +486,42 @@ void main() {
                 CameraPhase.ready,
             'reuse native camera ready',
           );
+          if (const bool.fromEnvironment('DARK_GALLERY_REVIEW')) {
+            await screenshot('camera', networkPhotos: false);
+            await tester.tap(find.bySemanticsLabel('Chụp ảnh'));
+            await waitFor(
+              () => find.byType(StampPreviewScreen).evaluate().isNotEmpty,
+              'dark native capture Preview',
+            );
+            final draft = container.read(stampComposerControllerProvider);
+            for (final pair in [
+              (draft.localImagePath!, 1440),
+              (draft.localThumbnailPath!, 512),
+            ]) {
+              final decoded = image.decodePng(
+                await File(pair.$1).readAsBytes(),
+              )!;
+              expect((decoded.width, decoded.height), (pair.$2, pair.$2));
+              expect(decoded.getPixel(0, 0).a, 0);
+            }
+            await screenshot('native-camera-preview', networkPhotos: false);
+            await tester.tap(find.bySemanticsLabel('Hủy ảnh'));
+            await waitFor(
+              () =>
+                  find.byType(StampPreviewScreen).evaluate().isEmpty &&
+                  container.read(cameraControllerProvider).phase ==
+                      CameraPhase.ready,
+              'dark native draft discard',
+            );
+          }
           final assets = await container
               .read(devAssetCaptureSourceProvider)
               .listImages();
           await tester.tap(find.byTooltip('DEV sample capture'));
           await tester.pump(const Duration(milliseconds: 500));
           await tester.tap(find.text(assets.first.split('/').last));
+          await tester.pump(const Duration(milliseconds: 800));
+          await tester.tap(find.bySemanticsLabel('Chụp ảnh'));
           await waitFor(
             () => find.byType(StampPreviewScreen).evaluate().isNotEmpty,
             'current stamp Preview',
@@ -373,6 +534,9 @@ void main() {
           );
         }
       }
+      // Leave the native preview before network/render validation.
+      router.go(AppRoutes.home);
+      await tester.pump(const Duration(seconds: 1));
       if (stampEdges) {
         for (final stamp in created) {
           final delivery = container.read(cloudinaryDeliveryRepositoryProvider);
@@ -382,26 +546,32 @@ void main() {
           ]) {
             expect(isProcessedStampImage(pair.$1), isTrue);
             final url = await delivery.resolve(pair.$1);
-            final response = await http
-                .get(Uri.parse(url))
-                .timeout(const Duration(seconds: 60));
-            expect(response.statusCode, 200);
-            expect(response.bodyBytes.take(8), [
-              137,
-              80,
-              78,
-              71,
-              13,
-              10,
-              26,
-              10,
-            ]);
-            // Native decoder is the same renderer used by Image; avoid costly
-            // repeated pure-Dart full-image decode in a debug emulator harness.
-            final codec = await ui.instantiateImageCodec(response.bodyBytes);
-            final frame = await codec.getNextFrame();
+            debugPrint('BACKEND_STEP PNG_FETCH_BEGIN_${pair.$2}_${stamp.id}');
+            // Exercise the application's actual NetworkImage loading/decoding
+            // path while pumping frames, rather than a second HTTP client.
+            final stream = NetworkImage(url).resolve(ImageConfiguration.empty);
+            ui.Image? decoded;
+            Object? failure;
+            final listener = ImageStreamListener(
+              (info, _) {
+                decoded ??= info.image.clone();
+              },
+              onError: (Object error, StackTrace? _) {
+                failure = error;
+              },
+            );
+            stream.addListener(listener);
             try {
-              final png = frame.image;
+              await waitFor(
+                () => decoded != null || failure != null,
+                'delivered ${pair.$2} image decode',
+              );
+              expect(
+                failure,
+                isNull,
+                reason: 'Delivered image must render successfully.',
+              );
+              final png = decoded!;
               expect((png.width, png.height), (pair.$2, pair.$2));
               final pixels = (await png.toByteData(
                 format: ui.ImageByteFormat.rawRgba,
@@ -417,8 +587,8 @@ void main() {
               expect(alpha(n - 1, notch), 0);
               expect(alpha(n ~/ 2, n ~/ 2), 255);
             } finally {
-              frame.image.dispose();
-              codec.dispose();
+              stream.removeListener(listener);
+              decoded?.dispose();
             }
           }
           debugPrint('BACKEND_STEP DELIVERED_STAMP_ALPHA_${stamp.id}');
@@ -454,6 +624,15 @@ void main() {
         'Calendar actual memory',
       );
       await screenshot('calendar');
+      if (readmeReview) {
+        await tester.timedDrag(
+          find.byKey(const PageStorageKey('calendar-scroll')),
+          const Offset(0, -340),
+          const Duration(seconds: 2),
+        );
+        await tester.pump(const Duration(seconds: 1));
+        await screenshot('calendar-selected-day');
+      }
       await login(DevTestAccount.b);
       router.go(AppRoutes.inbox);
       await container.read(inboxControllerProvider.notifier).refresh();
@@ -467,9 +646,23 @@ void main() {
         'B actual deliveries',
       );
       await screenshot('inbox-b');
+      if (readmeReview) {
+        for (final sent in created) {
+          final received = container
+              .read(inboxControllerProvider)
+              .items
+              .singleWhere((stamp) => stamp.id == sent.id);
+          expect(received.title, sent.title);
+          expect(received.locationLabel, sent.locationLabel);
+          expect(received.capturedAt, sent.capturedAt);
+          expect(received.senderName, sent.senderName);
+        }
+        debugPrint('BACKEND_CASE DELIVERY_METADATA_PASS_${created.length}');
+      }
       router.go(AppRoutes.stamp(created.last.id));
       await tester.pump(const Duration(seconds: 1));
       await screenshot('detail-b');
+      if (readmeReview) await login(DevTestAccount.a);
       debugPrint('BACKEND_CASE PHOTO_PRESENTATION_PASS_${created.length}');
     } finally {
       await tester.pumpWidget(const SizedBox.shrink());

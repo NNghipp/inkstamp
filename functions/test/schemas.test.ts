@@ -49,6 +49,17 @@ describe("publishStampSchema", () => {
     ).toThrow();
   });
 
+  it("validates optional metadata and ignores client publish-time fields", () => {
+    const metadata = { capturedAt: "2026-10-15T09:05:00+07:00", title: "Cổng đỏ Kyoto", locationLabel: "Kyoto" };
+    expect(publishStampSchema.parse({ ...validPayload, ...metadata })).toMatchObject(metadata);
+    expect(() => publishStampSchema.parse({ ...validPayload, capturedAt: "yesterday" })).toThrow();
+    expect(() => publishStampSchema.parse({ ...validPayload, title: "x".repeat(81) })).toThrow();
+    expect(() => publishStampSchema.parse({ ...validPayload, locationLabel: " " })).toThrow();
+    const parsed = publishStampSchema.parse({ ...validPayload, createdAt: "fake", publishedAt: "fake" });
+    expect(parsed).not.toHaveProperty("createdAt");
+    expect(parsed).not.toHaveProperty("publishedAt");
+  });
+
   it("allows a reply without selected recipients", () => {
     expect(
       publishStampSchema.parse({

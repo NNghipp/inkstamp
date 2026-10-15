@@ -131,7 +131,7 @@ class _QuickAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: AppColors.white,
+      color: Theme.of(context).colorScheme.surfaceContainer,
       borderRadius: BorderRadius.circular(20),
       child: InkWell(
         onTap: onTap,
@@ -141,8 +141,13 @@ class _QuickAction extends StatelessWidget {
           child: Row(
             children: <Widget>[
               CircleAvatar(
-                backgroundColor: color,
-                child: Icon(icon, color: AppColors.ink),
+                backgroundColor: Theme.of(
+                  context,
+                ).colorScheme.surfaceContainerHigh,
+                child: Icon(
+                  icon,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
               ),
               const SizedBox(width: AppSpacing.sm),
               Expanded(

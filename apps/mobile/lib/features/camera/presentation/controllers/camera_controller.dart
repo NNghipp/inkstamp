@@ -279,17 +279,27 @@ class InkstampCameraController extends Notifier<CameraControllerState> {
     if (!devAssetCaptureEnabled || state.isBusy) return false;
     return _captureFrom(
       () => ref.read(devAssetCaptureSourceProvider).captureRawImage(asset),
+      sampleAsset: asset,
     );
   }
 
   // Hardware and DEV assets share processing, lifecycle guards and draft handoff.
-  Future<bool> _captureFrom(Future<String> Function() captureRawImage) async {
+  Future<bool> _captureFrom(
+    Future<String> Function() captureRawImage, {
+    String? sampleAsset,
+  }) async {
     final generation = _generation;
     state = state.copyWith(phase: CameraPhase.capturing, clearError: true);
     return _operations.run(() async {
       if (!_current(generation)) return false;
       String? rawPath;
       try {
+        final capturedAt = DateTime.now();
+        final metadata = sampleAsset == null
+            ? null
+            : await ref
+                  .read(devAssetCaptureSourceProvider)
+                  .metadata(sampleAsset);
         rawPath = await captureRawImage();
         if (!_current(generation)) {
           await _processor.deleteFiles([rawPath]);
@@ -326,6 +336,9 @@ class InkstampCameraController extends Notifier<CameraControllerState> {
               replyToStampId: previousDraft.replyToStampId,
               localImagePath: processed.imagePath,
               localThumbnailPath: processed.thumbnailPath,
+              capturedAt: metadata?.capturedAt ?? capturedAt,
+              title: metadata?.title,
+              locationLabel: metadata?.locationLabel,
             );
         state = state.copyWith(phase: CameraPhase.ready);
         return true;

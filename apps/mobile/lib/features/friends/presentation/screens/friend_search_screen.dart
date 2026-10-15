@@ -73,7 +73,7 @@ class _FriendSearchScreenState extends ConsumerState<FriendSearchScreen> {
               ),
             ),
           if (state.isLoading)
-            const LinearProgressIndicator(color: AppColors.ink)
+            const LinearProgressIndicator()
           else
             Expanded(
               child: state.searchResults.isEmpty

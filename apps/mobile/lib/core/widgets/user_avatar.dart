@@ -1,17 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:inkstamp/app/theme/app_colors.dart';
 
 class UserAvatar extends StatelessWidget {
   const UserAvatar({
     required this.name,
     this.size = 44,
-    this.backgroundColor = AppColors.sky,
+    this.backgroundColor,
     super.key,
   });
 
   final String name;
   final double size;
-  final Color backgroundColor;
+  final Color? backgroundColor;
 
   @override
   Widget build(BuildContext context) {
@@ -27,8 +26,10 @@ class UserAvatar extends StatelessWidget {
       label: '$name profile picture',
       child: CircleAvatar(
         radius: size / 2,
-        backgroundColor: backgroundColor,
-        foregroundColor: AppColors.ink,
+        backgroundColor:
+            backgroundColor ??
+            Theme.of(context).colorScheme.surfaceContainerHigh,
+        foregroundColor: Theme.of(context).colorScheme.onSurface,
         child: Text(
           initials,
           style: TextStyle(fontWeight: FontWeight.w700, fontSize: size * 0.34),

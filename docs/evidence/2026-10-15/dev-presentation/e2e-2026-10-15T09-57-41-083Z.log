@@ -1,0 +1,15 @@
+2026-10-15T09:57:41.083Z
+√ Built build\app\outputs\flutter-apk\app-debug.apk
+00:00 +0: real DEV backend photo presentation
+BACKEND_STEP PHOTO_REUSED_6cdac10d-5b0b-4206-87c8-d27a588ab1a9
+BACKEND_STEP PHOTO_REUSED_89c3fc36-5737-4efd-be7e-a9c1873d3232
+The following TestFailure was thrown running a test:
+Expected: exactly one matching candidate
+  Actual: _KeyWidgetFinder:<Found 0 widgets with key [<'dev-camera-static-preview'>]: []>
+  real DEV backend photo presentation
+00:13 +0 -1: real DEV backend photo presentation [E]
+  Test failed. See exception logs above.
+  The test description was: real DEV backend photo presentation
+00:13 +0 -1: Some tests failed.
+  D:/stampcard/apps/mobile/integration_test/photo_presentation_test.dart: real DEV backend photo presentation
+BACKEND_E2E_EXIT=1

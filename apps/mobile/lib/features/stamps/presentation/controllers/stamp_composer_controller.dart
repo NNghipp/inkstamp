@@ -42,6 +42,9 @@ class StampComposerController extends Notifier<StampDraft> {
     String? replyToStampId,
     required String localImagePath,
     required String localThumbnailPath,
+    DateTime? capturedAt,
+    String? title,
+    String? locationLabel,
   }) {
     _ownedPaths
       ..clear()
@@ -50,6 +53,9 @@ class StampComposerController extends Notifier<StampDraft> {
       replyToStampId: replyToStampId,
       localImagePath: localImagePath,
       localThumbnailPath: localThumbnailPath,
+      capturedAt: capturedAt,
+      title: title,
+      locationLabel: locationLabel,
     );
   }
 

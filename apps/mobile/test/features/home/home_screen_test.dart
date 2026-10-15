@@ -16,7 +16,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         child: MaterialApp(
-          theme: AppTheme.light,
+          theme: AppTheme.dark,
           home: const Scaffold(body: HomeScreen(initializeCamera: false)),
         ),
       ),
@@ -24,7 +24,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('khoảnh khắc'), findsOneWidget);
-    expect(find.text('BẢN TIN THỊ GIÁC'), findsOneWidget);
+    expect(find.text('Những khoảnh khắc được giữ lại.'), findsOneWidget);
     expect(find.text('Nắng sớm ngõ nhỏ'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });

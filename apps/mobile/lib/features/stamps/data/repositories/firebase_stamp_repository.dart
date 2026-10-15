@@ -168,16 +168,29 @@ class FirebaseStampRepository implements StampRepository {
             'replyToStampId': draft.replyToStampId,
           'frameStyle': draft.frameStyle.name,
           'paperTone': draft.paperTone.name,
-          'captureLocalDate': DateTime.now().toIso8601String().substring(0, 10),
+          'captureLocalDate': draft.captureTime.toIso8601String().substring(
+            0,
+            10,
+          ),
+          if (draft.capturedAt != null)
+            'capturedAt': draft.capturedAt!.toUtc().toIso8601String(),
+          if (draft.title != null) 'title': draft.title,
+          if (draft.locationLabel != null) 'locationLabel': draft.locationLabel,
           'timezoneOffsetMinutes': DateTime.now().timeZoneOffset.inMinutes,
         });
     final String stampId = result.data['stampId'] as String;
+    final published = await _firestore.doc('stamps/$stampId').get();
+    final publishedData = published.data();
+    if (publishedData == null) throw StateError('Published stamp unavailable.');
     return Stamp(
       id: stampId,
       senderId: _userId,
-      senderName: 'You',
-      createdAt: DateTime.now(),
+      senderName: publishedData['senderName'] as String? ?? 'Bạn bè',
+      createdAt: (publishedData['createdAt'] as Timestamp).toDate(),
       seed: draft.seed,
+      capturedAt: draft.capturedAt,
+      title: draft.title,
+      locationLabel: draft.locationLabel,
       frameStyle: draft.frameStyle,
       paperTone: draft.paperTone,
       isSentByMe: true,
@@ -196,6 +209,9 @@ class FirebaseStampRepository implements StampRepository {
       createdAt: timestamp?.toDate() ?? DateTime.fromMillisecondsSinceEpoch(0),
       seed: id.hashCode,
       caption: data['caption'] as String?,
+      capturedAt: (data['capturedAt'] as Timestamp?)?.toDate(),
+      title: data['title'] as String?,
+      locationLabel: data['locationLabel'] as String?,
       frameStyle: StampFrameStyle.values.byName(
         data['frameStyle'] as String? ?? 'classic',
       ),

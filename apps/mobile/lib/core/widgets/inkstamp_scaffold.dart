@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:inkstamp/app/theme/app_colors.dart';
 
 class InkstampScaffold extends StatelessWidget {
   const InkstampScaffold({
@@ -28,14 +27,8 @@ class InkstampScaffold extends StatelessWidget {
       appBar: title == null
           ? null
           : AppBar(title: Text(title!), actions: actions),
-      body: DecoratedBox(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: <Color>[AppColors.paper, Color(0xFFF1E9DE)],
-          ),
-        ),
+      body: Material(
+        color: Theme.of(context).colorScheme.surface,
         child: SafeArea(
           top: title == null,
           child: Padding(padding: padding, child: body),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:inkstamp/app/theme/app_colors.dart';
+import 'package:inkstamp/app/theme/app_motion.dart';
 import 'package:inkstamp/app/theme/app_spacing.dart';
+import 'package:inkstamp/app/theme/gallery_tokens.dart';
 import 'package:inkstamp/features/stamps/domain/entities/stamp.dart';
 
 class ReactionBar extends StatelessWidget {
@@ -18,11 +19,11 @@ class ReactionBar extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.xs),
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: GalleryTokens.glass,
         borderRadius: BorderRadius.circular(28),
         boxShadow: <BoxShadow>[
           BoxShadow(
-            color: AppColors.ink.withValues(alpha: 0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 18,
             offset: const Offset(0, 8),
           ),
@@ -41,17 +42,22 @@ class ReactionBar extends StatelessWidget {
                   onTap: () => onSelected(reaction),
                   customBorder: const CircleBorder(),
                   child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 160),
-                    padding: const EdgeInsets.all(AppSpacing.xs),
+                    duration: AppMotion.duration(context, AppMotion.fast),
+                    constraints: const BoxConstraints(
+                      minWidth: 44,
+                      minHeight: 48,
+                    ),
+                    alignment: Alignment.center,
+                    padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? AppColors.butter.withValues(alpha: 0.55)
+                          ? GalleryTokens.selectedGlass
                           : Colors.transparent,
                       shape: BoxShape.circle,
                     ),
                     child: Text(
                       reaction.emoji,
-                      style: TextStyle(fontSize: isSelected ? 27 : 23),
+                      style: const TextStyle(fontSize: 22),
                     ),
                   ),
                 ),

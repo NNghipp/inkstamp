@@ -1,0 +1,10 @@
+camera_open_ms=4966
+rapid_switches=20 PASS
+ANDROID_BACKGROUND_REQUEST
+background_resume PASS
+native_stamp_1440_512_alpha PASS
+PREVIEW_BACKGROUND_REQUEST
+preview_return_retake_cleanup PASS
+SAMPLE_BACKGROUND_REQUEST
+sample_background_clear PASS
+CAMERA_HARDENING_EXIT=0

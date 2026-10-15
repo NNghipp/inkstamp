@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:inkstamp/app/router/main_shell.dart';
 import 'package:inkstamp/app/theme/app_theme.dart';
 import 'package:inkstamp/features/archive/presentation/screens/calendar_screen.dart';
+import 'package:inkstamp/features/camera/data/repositories/dev_asset_capture_source.dart';
 import 'package:inkstamp/features/camera/presentation/controllers/camera_controller.dart';
 import 'package:inkstamp/features/camera/presentation/screens/camera_screen.dart';
 import 'package:inkstamp/features/home/presentation/screens/home_screen.dart';
@@ -63,10 +65,7 @@ void main() {
       await tester.pumpWidget(
         UncontrolledProviderScope(
           container: container,
-          child: MaterialApp.router(
-            theme: AppTheme.light,
-            routerConfig: router,
-          ),
+          child: MaterialApp.router(theme: AppTheme.dark, routerConfig: router),
         ),
       );
       await ready();
@@ -108,6 +107,35 @@ void main() {
       expect(find.byType(StampPreviewScreen), findsOneWidget);
       final draft = container.read(stampComposerControllerProvider);
       expect(await File(draft.localImagePath!).exists(), isTrue);
+      for (final output in [
+        (draft.localImagePath!, 1440),
+        (draft.localThumbnailPath!, 512),
+      ]) {
+        final codec = await ui.instantiateImageCodec(
+          await File(output.$1).readAsBytes(),
+        );
+        final frame = await codec.getNextFrame();
+        try {
+          expect(
+            (frame.image.width, frame.image.height),
+            (output.$2, output.$2),
+          );
+          final pixels = (await frame.image.toByteData(
+            format: ui.ImageByteFormat.rawRgba,
+          ))!;
+          expect(pixels.getUint8(3), 0);
+          expect(
+            pixels.getUint8(
+              ((output.$2 ~/ 2) * output.$2 + output.$2 ~/ 2) * 4 + 3,
+            ),
+            255,
+          );
+        } finally {
+          frame.image.dispose();
+          codec.dispose();
+        }
+      }
+      debugPrint('HARDENING native_stamp_1440_512_alpha PASS');
       debugPrint('HARDENING PREVIEW_BACKGROUND_REQUEST');
       await Future<void>.delayed(const Duration(seconds: 5));
       expect(
@@ -125,6 +153,41 @@ void main() {
       await ready();
       expect(tester.takeException(), isNull);
       debugPrint('HARDENING preview_return_retake_cleanup PASS');
+      final assets = await container
+          .read(devAssetCaptureSourceProvider)
+          .listImages();
+      expect(assets, isNotEmpty);
+      await tester.tap(find.byTooltip('DEV sample capture'));
+      await tester.pump(const Duration(seconds: 1));
+      await tester.scrollUntilVisible(
+        find.text(assets.first.split('/').last),
+        100,
+        scrollable: find
+            .descendant(
+              of: find.byType(BottomSheet),
+              matching: find.byType(Scrollable),
+            )
+            .last,
+      );
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.tap(find.text(assets.first.split('/').last));
+      await tester.pump(const Duration(seconds: 1));
+      final staticPreview = find.byKey(
+        const ValueKey('dev-camera-static-preview'),
+      );
+      expect(staticPreview, findsOneWidget);
+      debugPrint('HARDENING SAMPLE_BACKGROUND_REQUEST');
+      await Future<void>.delayed(const Duration(seconds: 5));
+      await ready();
+      expect(staticPreview, findsOneWidget);
+      await tester.tap(find.byTooltip('DEV sample capture'));
+      await tester.pump(const Duration(seconds: 1));
+      await tester.tap(find.text('Camera thật'));
+      await tester.pump(const Duration(seconds: 1));
+      expect(staticPreview, findsNothing);
+      await ready();
+      expect(tester.takeException(), isNull);
+      debugPrint('HARDENING sample_background_clear PASS');
     } finally {
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pump();

@@ -35,6 +35,9 @@ class Stamp {
     this.cloudinaryPublicId,
     this.cloudinaryThumbnailPublicId,
     this.caption,
+    this.capturedAt,
+    this.title,
+    this.locationLabel,
   });
 
   final String id;
@@ -51,9 +54,14 @@ class Stamp {
   final String? cloudinaryPublicId;
   final String? cloudinaryThumbnailPublicId;
   final String? caption;
+  final DateTime? capturedAt;
+  final String? title;
+  final String? locationLabel;
+  DateTime get captureTime => capturedAt ?? createdAt;
+  DateTime get publishedAt => createdAt;
 
   String get shortTitle {
-    final text = caption?.trim() ?? '';
+    final text = title?.trim() ?? caption?.trim() ?? '';
     final characters = text.runes.toList();
     return characters.length <= 28
         ? text
@@ -83,6 +91,9 @@ class Stamp {
       cloudinaryThumbnailPublicId:
           cloudinaryThumbnailPublicId ?? this.cloudinaryThumbnailPublicId,
       caption: caption,
+      capturedAt: capturedAt,
+      title: title,
+      locationLabel: locationLabel,
     );
   }
 }

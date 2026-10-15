@@ -1,5 +1,5 @@
 // Runtime credentials go to the debuggable app's private files directory only.
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { spawn, spawnSync } from 'node:child_process';
 import { dirname, resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,6 +10,8 @@ const workspace = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const photoReview = process.argv.includes('--photo-review');
 const stampEdges = process.argv.includes('--stamp-edges');
 const reusePhotos = process.argv.includes('--reuse-photos');
+const darkGallery = process.argv.includes('--dark-gallery');
+const readmePresentation = process.argv.includes('--readme-presentation');
 const config = JSON.parse(await readFile(join(workspace, '.env.dev-test-auth.json'), 'utf8'));
 if (config.projectId !== 'inkstamp-dev') throw new Error('Wrong credential project.');
 const faultControlSecret = randomUUID();
@@ -21,7 +23,11 @@ function adbCall(args, input) {
   if (result.status !== 0) throw new Error('ADB private credential transfer/cleanup failed.');
 }
 let transferred = false;
-const evidence = join(workspace, stampEdges
+const evidence = join(workspace, readmePresentation
+  ? 'docs/evidence/2026-10-15/dev-presentation'
+  : darkGallery
+  ? 'docs/evidence/2026-10-14/dark-gallery'
+  : stampEdges
   ? `docs/evidence/2026-10-11/stamp-edges${reusePhotos ? '/current' : ''}`
   : photoReview
   ? `docs/evidence/2026-10-11/photo-presentation/${process.argv.includes('--before-photos') ? 'before-loaded' : reusePhotos ? 'after' : 'before'}`
@@ -41,6 +47,8 @@ try {
     '--dart-define=APP_ENV=dev', '--dart-define=ENABLE_DEV_TEST_AUTH=true', '--dart-define=BACKEND_MODE=functions_emulator', '--dart-define=DEV_FUNCTIONS_PORT=5002', '--dart-define=MEDIA_GATEWAY_BASE_URL=http://127.0.0.1:8787',
     ...(reusePhotos ? ['--dart-define=PHOTO_REVIEW_REUSE=true'] : []),
     ...(stampEdges ? ['--dart-define=STAMP_EDGES_REVIEW=true'] : []),
+    ...(darkGallery ? ['--dart-define=DARK_GALLERY_REVIEW=true'] : []),
+    ...(readmePresentation ? ['--dart-define=README_PRESENTATION=true'] : []),
   ], { cwd: join(workspace, 'apps/mobile'), shell: process.platform === 'win32', windowsHide: true });
   let output = '';
   function consume(chunk) {
@@ -70,6 +78,15 @@ try {
   console.log(safe.join('\n'));
   console.log(`BACKEND_E2E_EXIT=${status}`);
   process.exitCode = status ?? 1;
+  if (status === 0 && readmePresentation) {
+    const destination = join(workspace, 'docs/readme-assets');
+    await mkdir(destination, { recursive: true });
+    for (const [source, target] of [
+      ['camera-sample', 'camera-screen'], ['preview-stamp', 'preview-stamp'],
+      ['history', 'history-screen'], ['calendar-selected-day', 'calendar-screen'],
+      ['profile', 'profile-collection'], ['detail-0', 'memory-detail'],
+    ]) await copyFile(join(evidence, `${source}.png`), join(destination, `${target}.png`));
+  }
 } finally {
   proxy.close();
   adbCall(['shell', 'run-as', 'com.inkstamp.app', 'rm', '-f', 'files/dev-test-auth.json']);

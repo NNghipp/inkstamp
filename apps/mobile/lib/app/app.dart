@@ -16,7 +16,7 @@ class InkstampApp extends ConsumerWidget {
       title: 'Inkstamp',
       debugShowCheckedModeBanner: false,
       locale: const Locale('en'),
-      theme: AppTheme.light,
+      theme: AppTheme.dark,
       routerConfig: router,
     );
   }

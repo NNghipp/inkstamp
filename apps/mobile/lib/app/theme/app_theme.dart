@@ -1,7 +1,80 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:inkstamp/app/theme/app_typography.dart';
+import 'package:inkstamp/app/theme/gallery_tokens.dart';
 
 abstract final class AppTheme {
+  static ThemeData get dark {
+    const scheme = ColorScheme.dark(
+      primary: GalleryTokens.accent,
+      onPrimary: GalleryTokens.canvas,
+      secondary: GalleryTokens.secondaryText,
+      onSecondary: GalleryTokens.canvas,
+      surface: GalleryTokens.canvas,
+      surfaceContainerLow: GalleryTokens.secondary,
+      surfaceContainer: GalleryTokens.surface,
+      surfaceContainerHigh: Color(0xFF2B2C31),
+      onSurface: GalleryTokens.text,
+      onSurfaceVariant: GalleryTokens.secondaryText,
+      outline: GalleryTokens.muted,
+      outlineVariant: GalleryTokens.line,
+    );
+    final base = ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.dark,
+      colorScheme: scheme,
+      scaffoldBackgroundColor: GalleryTokens.canvas,
+      fontFamily: AppTypography.fontFamily,
+    );
+    return base.copyWith(
+      textTheme: base.textTheme
+          .copyWith(
+            headlineLarge: AppTypography.title.copyWith(
+              color: GalleryTokens.text,
+            ),
+            headlineMedium: AppTypography.heading.copyWith(
+              color: GalleryTokens.text,
+            ),
+            bodyLarge: AppTypography.body.copyWith(color: GalleryTokens.text),
+            bodyMedium: AppTypography.body.copyWith(color: GalleryTokens.text),
+            labelLarge: AppTypography.label.copyWith(color: GalleryTokens.text),
+          )
+          .apply(fontFamily: AppTypography.fontFamily),
+      appBarTheme: AppBarTheme(
+        backgroundColor: GalleryTokens.canvas,
+        foregroundColor: GalleryTokens.text,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        systemOverlayStyle: SystemUiOverlayStyle.light.copyWith(
+          statusBarColor: Colors.transparent,
+          systemNavigationBarColor: GalleryTokens.canvas,
+        ),
+        titleTextStyle: AppTypography.heading.copyWith(
+          color: GalleryTokens.text,
+          fontFamily: AppTypography.fontFamily,
+        ),
+      ),
+      iconButtonTheme: IconButtonThemeData(
+        style: IconButton.styleFrom(minimumSize: const Size.square(48)),
+      ),
+      dividerColor: GalleryTokens.line,
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: GalleryTokens.glass,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: GalleryTokens.line),
+        ),
+      ),
+      snackBarTheme: const SnackBarThemeData(
+        backgroundColor: GalleryTokens.surface,
+        contentTextStyle: TextStyle(color: GalleryTokens.text),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   static ThemeData get light {
     const ColorScheme colorScheme = ColorScheme.light(
       primary: Color(0xFF020302),

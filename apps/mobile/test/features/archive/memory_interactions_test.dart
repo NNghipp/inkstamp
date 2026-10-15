@@ -56,7 +56,7 @@ void main() {
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
-        child: MaterialApp.router(theme: AppTheme.light, routerConfig: router),
+        child: MaterialApp.router(theme: AppTheme.dark, routerConfig: router),
       ),
     );
     await tester.pumpAndSettle();
@@ -148,6 +148,7 @@ void main() {
       );
       expect(find.text('Tem mới'), findsOneWidget);
       expect(find.text('Tem cũ'), findsOneWidget);
+      await tester.ensureVisible(find.text('2025'));
       await tester.tap(find.text('2025'));
       await tester.pumpAndSettle();
       expect(
@@ -210,7 +211,7 @@ void main() {
   );
 
   testWidgets(
-    'Collection keeps three equal square thumbnail tiles and one-line titles',
+    'Collection uses square thumbnails with varied sizes and one-line titles',
     (tester) async {
       final stamps = List.generate(
         3,
@@ -239,7 +240,7 @@ void main() {
       for (var i = 0; i < 3; i++) {
         expect(tester.widget<MemoryPhoto>(photos.at(i)).publicId, 'thumb-$i');
         expect(sizes[i].width, closeTo(sizes[i].height, .01));
-        expect(sizes[i], sizes.first);
+        expect(tester.widget<MemoryPhoto>(photos.at(i)).decodeSize, 512);
         expect(tester.widget<Text>(find.text('Ảnh $i')).maxLines, 1);
       }
       expect(tester.takeException(), isNull);
@@ -266,7 +267,7 @@ void main() {
       final size = tester.getSize(find.byWidget(e.widget));
       expect(size.width, closeTo(size.height, .01));
     }
-    expect(tester.getSize(photos.first), const Size(21, 21));
+    expect(tester.getSize(photos.first), const Size(28, 28));
     expect(tester.takeException(), isNull);
   });
 

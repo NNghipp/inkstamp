@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:inkstamp/app/theme/gallery_tokens.dart';
 
 abstract final class EditorialColors {
-  static const Color canvas = Color(0xFFF9F9F6);
-  static const Color paper = Color(0xFFFFFFFF);
-  static const Color ink = Color(0xFF1A1C1B);
-  static const Color muted = Color(0xFF777771);
-  static const Color line = Color(0x1F1D1D1B);
+  static const Color canvas = GalleryTokens.canvas;
+  static const Color paper = GalleryTokens.surface;
+  static const Color ink = GalleryTokens.text;
+  static const Color muted = GalleryTokens.secondaryText;
+  static const Color line = GalleryTokens.line;
 }
 
 abstract final class EditorialAssets {

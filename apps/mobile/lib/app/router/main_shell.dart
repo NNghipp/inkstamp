@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:inkstamp/app/router/app_routes.dart';
+import 'package:inkstamp/app/theme/gallery_tokens.dart';
 
 class MainShell extends StatelessWidget {
   const MainShell({required this.child, super.key});
@@ -17,17 +19,23 @@ class MainShell extends StatelessWidget {
       _ => 0,
     };
 
-    return Scaffold(
-      body: child,
-      bottomNavigationBar: _EditorialNavigation(
-        selectedIndex: selectedIndex,
-        onSelected: (int index) => context.go(
-          <String>[
-            AppRoutes.home,
-            AppRoutes.calendar,
-            AppRoutes.camera,
-            AppRoutes.profile,
-          ][index],
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light.copyWith(
+        statusBarColor: Colors.transparent,
+        systemNavigationBarColor: GalleryTokens.secondary,
+      ),
+      child: Scaffold(
+        body: child,
+        bottomNavigationBar: _EditorialNavigation(
+          selectedIndex: selectedIndex,
+          onSelected: (int index) => context.go(
+            <String>[
+              AppRoutes.home,
+              AppRoutes.calendar,
+              AppRoutes.camera,
+              AppRoutes.profile,
+            ][index],
+          ),
         ),
       ),
     );
@@ -53,8 +61,8 @@ class _EditorialNavigation extends StatelessWidget {
     ];
     return DecoratedBox(
       decoration: const BoxDecoration(
-        color: Color(0xFFF9F9F6),
-        border: Border(top: BorderSide(color: Color(0x18777771))),
+        color: GalleryTokens.secondary,
+        border: Border(top: BorderSide(color: GalleryTokens.line)),
       ),
       child: SafeArea(
         top: false,
@@ -73,16 +81,16 @@ class _EditorialNavigation extends StatelessWidget {
                         items[index].$1,
                         size: selected ? 22 : 20,
                         color: selected
-                            ? const Color(0xFF111210)
-                            : const Color(0xFF5B5C57),
+                            ? GalleryTokens.text
+                            : GalleryTokens.secondaryText,
                       ),
                       const SizedBox(height: 3),
                       Text(
                         items[index].$2,
                         style: TextStyle(
                           color: selected
-                              ? const Color(0xFF111210)
-                              : const Color(0xFF494A46),
+                              ? GalleryTokens.text
+                              : GalleryTokens.secondaryText,
                           fontSize: 11,
                           fontWeight: selected
                               ? FontWeight.w600
@@ -94,7 +102,7 @@ class _EditorialNavigation extends StatelessWidget {
                         child: selected && index == 2
                             ? const DecoratedBox(
                                 decoration: BoxDecoration(
-                                  color: Colors.black,
+                                  color: GalleryTokens.accent,
                                   shape: BoxShape.circle,
                                 ),
                                 child: SizedBox.square(dimension: 3),

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -61,6 +62,57 @@ class PendingCaptureSource extends WidgetCaptureSource {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  test(
+    'optional sample metadata uses today and never blocks unknown photos',
+    () async {
+      final source = DevAssetCaptureSource(
+        bundle: MemoryAssetBundle({
+          '${DevAssetCaptureSource.prefix}demo_metadata.json':
+              Uint8List.fromList(
+                utf8.encode(
+                  jsonEncode({
+                    'known.jpg': {
+                      'title': '  Buổi sáng  ',
+                      'locationLabel': 'Kyoto',
+                      'time': '09:05',
+                    },
+                    'invalid.jpg': {
+                      'title': '',
+                      'locationLabel': 123,
+                      'time': '25:80',
+                    },
+                  }),
+                ),
+              ),
+        }),
+      );
+      final before = DateTime.now();
+      final known = await source.metadata(
+        '${DevAssetCaptureSource.prefix}known.jpg',
+      );
+      expect(known.title, devAssetCaptureEnabled ? 'Buổi sáng' : null);
+      expect(known.locationLabel, devAssetCaptureEnabled ? 'Kyoto' : null);
+      if (devAssetCaptureEnabled) {
+        expect(
+          known.capturedAt,
+          DateTime(before.year, before.month, before.day, 9, 5),
+        );
+      }
+      for (final asset in ['unknown.jpg', 'invalid.jpg']) {
+        final result = await source.metadata(
+          '${DevAssetCaptureSource.prefix}$asset',
+        );
+        expect(result.title, isNull);
+        expect(result.locationLabel, isNull);
+        expect(result.capturedAt.isBefore(before), isFalse);
+      }
+      final missing = await DevAssetCaptureSource(
+        bundle: MemoryAssetBundle({}),
+      ).metadata('${DevAssetCaptureSource.prefix}new.jpg');
+      expect(missing.title, isNull);
+      expect(await source.listImages(), isEmpty);
+    },
+  );
   test('supported formats come from the existing image decoder', () {
     expect(
       DevAssetCaptureSource.supportedAssets([
@@ -211,70 +263,106 @@ void main() {
       },
     );
 
-    testWidgets('picker can cancel, choose and enter existing Preview route', (
-      tester,
-    ) async {
-      final camera = FakeCameraRepository();
-      final processor = FakeImageProcessor();
-      final container = ProviderContainer(
-        overrides: [
-          cameraRepositoryProvider.overrideWithValue(camera),
-          imageProcessingRepositoryProvider.overrideWithValue(processor),
-          devAssetCaptureSourceProvider.overrideWithValue(
-            WidgetCaptureSource(),
+    testWidgets(
+      'picker selects static preview; only shutter captures; real camera returns',
+      (tester) async {
+        final camera = FakeCameraRepository();
+        final processor = FakeImageProcessor();
+        final container = ProviderContainer(
+          overrides: [
+            cameraRepositoryProvider.overrideWithValue(camera),
+            imageProcessingRepositoryProvider.overrideWithValue(processor),
+            devAssetCaptureSourceProvider.overrideWithValue(
+              WidgetCaptureSource(),
+            ),
+          ],
+        );
+        final router = GoRouter(
+          initialLocation: '/camera',
+          routes: [
+            GoRoute(
+              path: '/camera',
+              builder: (_, _) => const Scaffold(body: CameraScreen()),
+              routes: [
+                GoRoute(
+                  path: 'preview',
+                  builder: (_, _) =>
+                      const Scaffold(body: Text('Preview route')),
+                ),
+              ],
+            ),
+          ],
+        );
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: MaterialApp.router(routerConfig: router),
           ),
-        ],
-      );
-      final router = GoRouter(
-        initialLocation: '/camera',
-        routes: [
-          GoRoute(
-            path: '/camera',
-            builder: (_, _) => const Scaffold(body: CameraScreen()),
-            routes: [
-              GoRoute(
-                path: 'preview',
-                builder: (_, _) => const Scaffold(body: Text('Preview route')),
-              ),
-            ],
-          ),
-        ],
-      );
-      await tester.pumpWidget(
-        UncontrolledProviderScope(
-          container: container,
-          child: MaterialApp.router(routerConfig: router),
-        ),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('DEV sample capture'));
-      await tester.pumpAndSettle();
-      expect(find.text('personal.jpg'), findsOneWidget);
-      Navigator.of(tester.element(find.text('personal.jpg'))).pop();
-      await tester.pumpAndSettle();
-      expect(
-        container.read(stampComposerControllerProvider).localImagePath,
-        isNull,
-      );
-      await tester.tap(find.byTooltip('DEV sample capture'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('personal.jpg'));
-      await tester.pump();
-      await tester.pumpAndSettle();
-      expect(find.text('Preview route'), findsOneWidget);
-      expect(
-        container.read(stampComposerControllerProvider).localImagePath,
-        'processed-1440.jpg',
-      );
-      router.pop();
-      await tester.pumpAndSettle();
-      expect(container.read(cameraControllerProvider).phase, CameraPhase.ready);
-      expect(container.read(cameraRepositoryProvider), same(camera));
-      await tester.pumpWidget(const SizedBox());
-      await tester.pump();
-      router.dispose();
-      container.dispose();
-    });
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byTooltip('DEV sample capture'));
+        await tester.pumpAndSettle();
+        expect(find.text('personal.jpg'), findsOneWidget);
+        Navigator.of(tester.element(find.text('personal.jpg'))).pop();
+        await tester.pumpAndSettle();
+        expect(
+          container.read(stampComposerControllerProvider).localImagePath,
+          isNull,
+        );
+        await tester.tap(find.byTooltip('DEV sample capture'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('personal.jpg'));
+        await tester.pump();
+        await tester.pumpAndSettle();
+        expect(find.text('Preview route'), findsNothing);
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.inactive,
+        );
+        await tester.pumpAndSettle();
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('dev-camera-static-preview')),
+          findsOneWidget,
+        );
+        expect(
+          container.read(stampComposerControllerProvider).localImagePath,
+          isNull,
+        );
+        await tester.tap(find.byTooltip('DEV sample capture'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Camera thật'));
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('dev-camera-static-preview')),
+          findsNothing,
+        );
+        await tester.tap(find.byTooltip('DEV sample capture'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('personal.jpg'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.bySemanticsLabel('Chụp ảnh'));
+        await tester.pumpAndSettle();
+        expect(find.text('Preview route'), findsOneWidget);
+        expect(
+          container.read(stampComposerControllerProvider).localImagePath,
+          'processed-1440.jpg',
+        );
+        router.pop();
+        await tester.pumpAndSettle();
+        expect(
+          container.read(cameraControllerProvider).phase,
+          CameraPhase.ready,
+        );
+        expect(container.read(cameraRepositoryProvider), same(camera));
+        await tester.pumpWidget(const SizedBox());
+        await tester.pump();
+        router.dispose();
+        container.dispose();
+      },
+    );
 
     for (final format in ['jpg', 'png']) {
       test(

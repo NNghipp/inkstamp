@@ -19,7 +19,7 @@ class FriendTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: AppColors.white,
+      color: Theme.of(context).colorScheme.surfaceContainer,
       borderRadius: BorderRadius.circular(20),
       child: InkWell(
         onTap: onTap,
@@ -30,7 +30,9 @@ class FriendTile extends StatelessWidget {
             children: <Widget>[
               UserAvatar(
                 name: friend.displayName,
-                backgroundColor: _avatarColor(friend.id),
+                backgroundColor: Theme.of(
+                  context,
+                ).colorScheme.surfaceContainerHigh,
               ),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
@@ -46,8 +48,8 @@ class FriendTile extends StatelessWidget {
                     ),
                     Text(
                       '@${friend.username}',
-                      style: const TextStyle(
-                        color: AppColors.charcoal,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                         fontSize: 13,
                       ),
                     ),
@@ -69,16 +71,5 @@ class FriendTile extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  Color _avatarColor(String id) {
-    const List<Color> colors = <Color>[
-      AppColors.sky,
-      AppColors.blush,
-      AppColors.mint,
-      AppColors.lilac,
-      AppColors.butter,
-    ];
-    return colors[id.hashCode.abs() % colors.length];
   }
 }

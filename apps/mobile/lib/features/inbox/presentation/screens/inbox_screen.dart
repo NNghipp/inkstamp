@@ -65,7 +65,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                   button: true,
                   label:
                       '${stamp.senderName}, ${stamp.isSeen ? "Đã đọc" : "Chưa đọc"}, '
-                      '${DateFormat('HH:mm · dd/MM').format(stamp.createdAt.toLocal())}',
+                      '${DateFormat('HH:mm · dd/MM').format(stamp.captureTime.toLocal())}',
                   child: PressFeedback(
                     child: InkWell(
                       onTap: () => context.push(AppRoutes.stamp(stamp.id)),
@@ -92,7 +92,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                                   Text(
                                     DateFormat(
                                       'HH:mm · dd/MM',
-                                    ).format(stamp.createdAt.toLocal()),
+                                    ).format(stamp.captureTime.toLocal()),
                                     style: const TextStyle(
                                       fontSize: 12,
                                       color: EditorialColors.muted,
@@ -123,6 +123,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                                 height: 56,
                                 child: MemoryPhoto(
                                   publicId: stamp.cloudinaryThumbnailPublicId,
+                                  decodeSize: 512,
                                 ),
                               ),
                             ),

@@ -64,6 +64,9 @@ export const publishStampSchema = z
     paperTone: paperToneSchema,
     captureLocalDate: z.iso.date(),
     timezoneOffsetMinutes: z.number().int().min(-840).max(840),
+    capturedAt: z.iso.datetime({ offset: true }).optional(),
+    title: z.string().trim().min(1).max(80).optional(),
+    locationLabel: z.string().trim().min(1).max(80).optional(),
   })
   .superRefine((value, context) => {
     if (

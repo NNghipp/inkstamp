@@ -6,7 +6,9 @@ manifest; no filename list/code edits are required. Keep its README if empty.
 
 Use the normal debug DEV backend/auth configuration from the recruiter guide.
 On Camera, tap the top **DEV sample capture** image icon and choose a filename.
-Cancel leaves Camera untouched. An empty folder shows a message. Real shutter,
+The selected image becomes a static preview; press the normal shutter to capture.
+Choose **Camera thật** in the picker to restore native preview. Cancel leaves the
+current selection untouched. An empty folder shows a message. Real shutter,
 flash, lens switching and native preview remain the existing camera path.
 
 ## Shared Pipeline
@@ -19,6 +21,15 @@ metadata removal and raw-file cleanup. The existing Preview route and composer
 continue into audience selection and the unchanged upload/publish/delivery flow.
 Inbox, Calendar and Memory Detail consume ordinary deliveries; no special mock
 publish or authorization bypass is introduced.
+
+Optional `assets/image_test/demo_metadata.json` supplies short `title`,
+`locationLabel` and a local `HH:mm` time on today's date. Discovery works without
+it. Invalid or absent metadata falls back to the actual capture time and no
+labels. `capturedAt`, `title` and `locationLabel` are optional publish metadata;
+the server continues to assign `createdAt` (publish time), and Calendar queries,
+authorization and Rules are unchanged. New stamp presentations use one capture
+date format, `DD.MM.YYYY`, inside the bottom-right safe area. Very small Calendar
+and Inbox thumbnails omit date text to stay legible.
 
 Discovery uses the existing `image` library's filename decoders, including
 JPEG/PNG/WebP/GIF/BMP/TIFF. HEIC/HEIF needs conversion first. Animated inputs
@@ -54,6 +65,9 @@ claimed as a new sample-photo A/B network E2E replay.
 The section above records the earlier source-only phase. Subsequent real-photo
 verification is recorded in [Photo Presentation](PHOTO_PRESENTATION.md); the
 current baked-alpha pipeline and exact latest checks are in [Stamp Edges](STAMP_EDGES.md).
+
+The 15/10/2026 static-preview, optional metadata, real delivery, lifecycle and
+README capture results are in [DEV presentation evidence](evidence/2026-10-15/dev-presentation/RESULTS.md).
 
 Run from `apps/mobile`:
 

@@ -1,133 +1,110 @@
 # InkStamp
 
-A camera-first Android app that turns small moments into stamp-style photos, shared with selected friends and revisited by date.
+InkStamp is a minimalist social camera app that turns photos into collectible postage-stamp memories and shares them with friends. Built with Flutter, it currently supports a verified Android DEV workflow—not a production release.
 
-**Flutter/Dart · Riverpod · GoRouter · Firebase · Cloudinary · Cloudflare Worker**
+## Overview
 
-**Verified DEV:** 130 Flutter tests; real A/B send/receive and sample-photo E2E; Camera stress PASS.
-**Google Sign-In E2E: DEFERRED · Production: NOT READY.**
+Capture a moment, preview its perforated stamp edges, choose your audience and send. Received memories appear in Inbox; moments can be revisited through History, Calendar and your Profile collection.
 
-<p>
-  <img src="docs/portfolio/screenshots/camera-golden.png" width="180" alt="Camera golden-test render with a sample photo">
-  <img src="docs/portfolio/screenshots/post-capture-golden.png" width="180" alt="Post-Capture golden-test render with sample recipients">
-</p>
+New photos become **1440×1440 PNGs with real transparent stamp edges**, plus **512×512 thumbnails**. The shape is part of the image itself, not a decorative UI frame. Older square memories remain supported.
 
-Unmodified Flutter widget-test renders with fixture data—not live-camera screenshots. [Media provenance](docs/portfolio/MEDIA_INDEX.md).
+## Key Features
 
-## Demo
+- Native camera capture, orientation correction and metadata cleanup.
+- Stamp-shaped processing and Post-Capture Preview.
+- Audience selection: all accepted friends or selected friends.
+- Friend Graph: username search, requests, accept/reject and Close Friends.
+- Inbox with unread/read states, History, Calendar and Profile collection.
+- Retry with a stable send identity and transactional, idempotent publishing.
+- Block/unblock and sender revoke logic, with the limitations below.
+- Debug DEV sample capture through the same processing and publishing pipeline.
+- Automated unit, widget, golden, backend and Android E2E coverage.
 
-Start with the [two-minute overview](docs/PORTFOLIO_OVERVIEW.md) or [recruiter walkthrough](docs/RECRUITER_DEMO.md).
+## Screens / Preview
 
-The current **debug DEV APK** is built at `apps/mobile/build/app/outputs/flutter-apk/app-debug.apk`. It is Git-ignored, not a public download or standalone production build. Sharing requires local Functions/gateway services, real DEV Firebase/Cloudinary access and privately configured A/B passwords.
+Real Android emulator screenshots from the dark DEV app. Sample photos use the shared capture, processing, upload and publish flow. Camera shows an optional DEV static sample preview; native Camera remains the default.
 
-Prepared-workstation flow: start backend → launch DEV app → Test A captures/sends → Test B opens Inbox/Calendar. [Exact run steps](#running-the-demo).
+<table>
+  <tr><th>Stamp Output</th><th>Camera</th></tr>
+  <tr>
+    <td><img src="docs/readme-assets/preview-stamp.png" width="280" alt="Post-Capture Preview of a Kyoto temple with transparent stamp edges and capture date"></td>
+    <td><img src="docs/readme-assets/camera-screen.png" width="280" alt="Camera controls and crop guide over a DEV sample photo"></td>
+  </tr>
+  <tr>
+    <td>A processed photo with baked stamp edges, ready to share.</td>
+    <td>Choose a DEV photo, then capture with the normal shutter.</td>
+  </tr>
+  <tr><th>History</th><th>Calendar</th></tr>
+  <tr>
+    <td><img src="docs/readme-assets/history-screen.png" width="280" alt="Dark History displaying published stamps with capture time, title and sender"></td>
+    <td><img src="docs/readme-assets/calendar-screen.png" width="280" alt="Dark Calendar with real stamp thumbnails and selected-day memories"></td>
+  </tr>
+  <tr>
+    <td>Published moments with compact time and name overlays.</td>
+    <td>Browse memories by date and open their details.</td>
+  </tr>
+</table>
 
-Debug DEV also supports personal sample captures from `apps/mobile/assets/image_test/` through a small Camera picker; it reuses real processing/sharing and is disabled outside debug DEV. [Usage and privacy boundary](docs/DEV_SAMPLE_CAPTURE.md).
+<details>
+  <summary>Profile / Collection</summary>
+  <p><img src="docs/readme-assets/profile-collection.png" width="280" alt="Dark Profile collection containing real perforated stamps"></p>
+  <p>New stamps alongside compatible older square photos.</p>
+</details>
 
-## Core Features
-
-- Native capture; 1440×1440 stamp-shaped PNG + 512×512 alpha thumbnail, orientation correction and EXIF removal. [Baked edges and compatibility](docs/STAMP_EDGES.md).
-- One-screen Post-Capture: stamp preview, audience selection, progress/retry and discard.
-- Friend Graph: username search, requests, accept/reject, Close Friends and block/unblock.
-- Custom/ALL sharing, authorized media, Inbox unread/read and Calendar memories.
-- Stable send identity/transactional retry; sender revoke with documented limits; guarded DEV-auth.
+Screenshots were captured on **2026-10-15** and preserve the Vietnamese UI and DEV account labels. Calendar shows the selected-day section after scrolling. Capture date uses **DD.MM.YYYY** inside the stamp; optional title, location and capture time travel with each memory. The server still assigns publish time. [Current evidence and file list](docs/evidence/2026-10-15/dev-presentation/RESULTS.md).
 
 ## Main User Flow
 
-~~~mermaid
-flowchart LR
-  Camera --> Capture --> Preview --> Audience --> Send --> Inbox
-  Inbox --> Detail
-  Inbox --> Calendar
+~~~text
+Camera → Capture / DEV Sample → Stamp Processing → Preview
+       → Select Audience → Publish → Inbox / History / Calendar / Profile
 ~~~
 
-Preview/audience/send are logical steps on one screen, not separate editor pages.
-
-## Screenshots
-
-| Screen | Visual | Source / caveat |
-|---|---|---|
-| Camera | [Camera](docs/portfolio/screenshots/camera-golden.png) | Golden; sample preview |
-| Post-Capture | [Preview/audience](docs/portfolio/screenshots/post-capture-golden.png) | Golden; fixture recipients |
-| History | [Moments feed](docs/portfolio/screenshots/history-golden.png) | Golden; sample memories |
-| Calendar | [Calendar](docs/portfolio/screenshots/calendar-golden.png) | Golden; [real DEV view](docs/portfolio/screenshots/calendar-dev-e2e.png) also available |
-| Profile | [Collection](docs/portfolio/screenshots/profile-golden.png) | Golden; fixture identity/statistics |
-| Inbox | [DEV Inbox](docs/portfolio/screenshots/inbox-dev-e2e.png) | Real E2E; visible pagination fixtures, not a polished hero |
-
-Fully loaded real History/Profile/Memory Detail and before/after comparisons are available in the [photo-presentation report](docs/PHOTO_PRESENTATION.md). A short demo recording is still missing. Loading/error frames are not presented as finished media. [Complete inventory](docs/portfolio/MEDIA_INDEX.md).
+Preview, audience selection and sending share one Post-Capture screen.
 
 ## Tech Stack
 
-| Area | Actually used |
+| Area | Technologies |
 |---|---|
-| Mobile | Flutter/Dart, Riverpod, GoRouter, native CameraX via camera plugin |
-| Images | Dart image library, app-private files, 1440/512 outputs, EXIF removal |
-| Identity/data | Firebase Auth, Firestore, Security Rules and indexes |
-| Business logic | TypeScript, callable Functions, Admin SDK, Zod; Functions Emulator for DEV |
-| Media | Cloudflare Worker/Wrangler, Firebase JWT verification, authenticated Cloudinary |
-| Tests | Flutter unit/widget/golden/integration tests, Vitest, Rules emulator, Android Emulator/ADB |
+| Mobile | Flutter, Dart, Riverpod, GoRouter, native camera plugin |
+| Images | Dart image library, normalized alpha mask, app-private draft files |
+| Authentication / data | Firebase Auth, Firestore, Security Rules and indexes |
+| Business logic | TypeScript, Firebase callable Functions, Admin SDK, Zod |
+| Media | Cloudinary authenticated assets, Cloudflare Worker gateway |
+| Verification | Flutter test / integration_test, Vitest, Firebase emulators, Android Emulator / ADB |
 
-Push, iOS/Apple E2E and analytics are not demonstrated features. Dependencies/scaffolds alone are not completion claims.
+## Current Test Status
 
-## Architecture
+Automated suites and static analysis were rechecked on **2026-10-15**. Counts overlap and must not be added together.
 
-Feature-first mobile code separates widgets, Riverpod orchestration, domain entities/repository contracts and SDK-backed data repositories. Controllers coordinate capture/drafts/publish/Inbox/Calendar; not every feature has a standalone use-case class.
+| Check | Result |
+|---|---|
+| Flutter, including Camera / processing / Preview / archive regression | 144/144 PASS |
+| Enabled DEV-auth | 7/7 PASS |
+| DEV sample capture | 10 PASS, 1 intentional opposite-build skip |
+| Firestore Rules | 7/7 PASS |
+| Cursor pagination | 8/8 PASS |
+| Functions | 31 PASS; 15 emulator-only cases skipped in the ordinary suite and run separately as Rules/pagination |
+| Media gateway | 39/39 PASS |
+| Analyzer | 0 issues |
+| Golden screenshots | 5 PASS; included in Flutter results |
+| Android Camera lifecycle | 1 PASS; 20 rapid tab switches, native/Preview/static background-resume, native alpha outputs and draft cleanup |
 
-Firebase Auth identifies callers. Local callable Functions run friendship/publish/revoke logic against **real DEV Firestore**, with explicit token verification. The Worker authorizes media and holds Cloudinary secrets, not the mobile app. Deliveries feed Inbox/Calendar.
+Android DEV presentation E2E passed **1/1**, checking four real published sample memories, full/thumbnail dimensions and transparency, recipient metadata, legacy images and native capture/discard. These are DEV functional checks, not production or physical-device performance certification. [Results and scope](docs/evidence/2026-10-15/dev-presentation/RESULTS.md).
 
-[Architecture/flow diagrams](docs/PORTFOLIO_OVERVIEW.md#architecture) · [Detailed architecture](docs/ARCHITECTURE.md)
+## Running the App
 
-## Testing
+### Prerequisites
 
-Last verified 2026-10-11, including the photo-presentation regression. Suites overlap and are not aggregated.
+- Flutter **3.47.1** (the CI baseline), Android SDK and a booted emulator.
+- Node.js **22**, Firebase CLI, and Java **21** for Firestore emulator tests.
+- Authorized DEV Firebase access; matching local `apps/mobile/android/app/google-services.json` and `apps/mobile/lib/firebase_options.dart`.
+- Private Cloudinary configuration in `workers/media-gateway/.dev.vars`, starting from [the empty template](workers/media-gateway/.dev.vars.example).
+- Privately configured DEV test accounts if using the guarded A/B login. See [DEV authentication](docs/DEV_TEST_AUTH.md).
 
-| Suite | Result | Purpose |
-|---|---|---|
-| Flutter | 130/130 PASS | Unit/widget/visual regression |
-| DEV-auth | 7/7 PASS | Flag-enabled guards/session isolation |
-| Regression | 58/58 PASS | Camera/Post-Capture/upload/visual/archive subset |
-| Rules | 7/7 PASS | Access-control denial |
-| Pagination | 8/8 PASS | Timestamp/ID cursors and ties |
-| Functions | 29/29 PASS | Business policies/idempotency |
-| Gateway | 39/39 PASS | Authorization/App Check/error handling and PNG format support |
-| Analyzer | Clean — 0 issues | Static checks |
-| Golden | 5 PASS | Feed/Profile/Calendar deliberately updated; Camera/Preview unchanged |
+A fresh clone needs this private setup for real sharing. Never commit credentials, signing keys or generated APKs.
 
-DEV-auth/regression/golden overlap Flutter: **not additive totals**. Ordinary Functions testing skips 15 emulator-only cases, separately executed as Rules/pagination. [Stamp-edge checks](docs/STAMP_EDGES.md) · [Earlier photo evidence](docs/PHOTO_PRESENTATION.md) · [Earlier hardening evidence](docs/evidence/2026-10-10/release-hardening/result.md).
-
-## E2E Coverage / Feature Status
-
-“DONE” means implemented/verified in the documented **Android DEV** environment.
-
-| Feature | Status | Notes |
-|---|---|---|
-| Camera/image processing | DONE | Real capture; 20 rapid transitions and background/Preview stress |
-| Post-Capture | DONE | Preview/audience/send, cleanup and retry retention |
-| Friend Graph | DONE (DEV routes) | Real A/B request/accept/reject/Close Friends; presenter route helper needed from current tab shell |
-| Custom / ALL audience | DONE | Captured upload → publish → delivery |
-| Inbox/read/Detail | DONE | Authorized lookup and unavailable states |
-| Calendar | DONE | Local-date selection/shared Detail |
-| Retry/idempotency | DONE | Real commit + lost response, no duplicate delivery |
-| Block/unblock | DONE | Blocker-owned policy; no restoration of old deliveries |
-| Revoke | DONE with limitations | Backend deletion/unavailable UI verified; no manual revoke button claimed |
-| Google Sign-In E2E | DEFERRED | No real Google login run |
-| Production release | NOT READY | Environment/signing/auth/link/smoke gates remain |
-
-Earlier hardening A/B replay passed 1/1 in 5:52, requiring Wait on an emulator System UI ANR under host memory pressure. Later Camera stress and the latest photo replays passed without that intervention. Four sample photos were actually published; the 126 pagination fixtures are **not 126 real publishes**. These runs are not a production performance certification.
-
-## Known Limitations
-
-Full demo depends on local services and internet for real DEV Auth/Firestore/Cloudinary. Spark retained; no billing enabled or production Functions deployment. Google E2E, PROD signing/configuration, real App Links and production/R8 smoke remain unverified.
-
-Current tabs do not expose a Friends launcher; the presenter uses existing authenticated URI routes described in the demo guide. Revoke has backend/E2E evidence, not a manual Detail-menu action. These are honest demo-navigation gaps, not newly implemented controls.
-
-Revoke denies new authorization and attempts deletion, but cannot erase saved bytes/screenshots. Old bearer URLs/CDN caches, deletion failures and revoked delivery metadata have limits. Process-death drafts, physical-device/accessibility/performance audits and large-scale queries remain unverified. [Release boundaries](docs/RELEASE_HARDENING.md); earlier phase docs are historical.
-
-## Running the Demo
-
-Prerequisites: Flutter/Android SDK, booted dedicated emulator, Node 22, Firebase CLI, authorized `inkstamp-dev` access, local Firebase registration files, Cloudinary `.dev.vars` and private Test A/B passwords. A fresh clone is **not** credential-free five-minute setup; recruiters can view screenshots or a presenter-led session without admin access.
-
-Prepare once, from repository root:
+Install dependencies from the repository root:
 
 ~~~powershell
 npm --prefix functions ci
@@ -137,7 +114,7 @@ flutter pub get
 cd ../..
 ~~~
 
-Terminal 1, root:
+Start local Functions in one terminal, from the root:
 
 ~~~powershell
 npm --prefix functions run build
@@ -146,14 +123,14 @@ $env:MEDIA_GATEWAY_BASE_URL='http://127.0.0.1:8787'
 firebase emulators:start --only functions --project inkstamp-dev
 ~~~
 
-Terminal 2, root:
+Start the media gateway in another terminal:
 
 ~~~powershell
 cd workers/media-gateway
 .\node_modules\.bin\wrangler.cmd dev --local --ip 127.0.0.1 --port 8787 --log-level warn --show-interactive-dev-session false
 ~~~
 
-Terminal 3, root; verified device `emulator-5554`:
+Run the app in a third terminal, initially from the root. Replace `emulator-5554` if your device ID differs; `adb` must be on PATH.
 
 ~~~powershell
 adb -s emulator-5554 reverse tcp:5001 tcp:5001
@@ -162,35 +139,29 @@ cd apps/mobile
 flutter run -d emulator-5554 --dart-define=APP_ENV=dev --dart-define=ENABLE_DEV_TEST_AUTH=true --dart-define=BACKEND_MODE=functions_emulator --dart-define=MEDIA_GATEWAY_BASE_URL=http://127.0.0.1:8787
 ~~~
 
-Only Functions is emulated: Auth/Firestore affect the real DEV project. Do not rebuild Functions during a demo/E2E. No deploy or billing upgrade is part of these commands. [Setup files, APK install and account-switch guide](docs/RECRUITER_DEMO.md).
+Only Functions runs locally: **Auth, Firestore and Cloudinary remain live DEV services**. Internet and authorized access are required. This setup retains Firebase **Spark** and does not deploy Functions or enable billing. Do not rebuild Functions while a demo/E2E run is active. [Backend details](docs/BACKEND_DEV_UNBLOCK.md).
 
-UI-only exploration from `apps/mobile`: `flutter run --dart-define=APP_ENV=dev --dart-define=DEMO_MODE=true` uses in-memory data, **not real sharing/E2E**.
+### Optional Sample Capture
 
-## Project Structure
+Add JPEG/PNG/WebP/GIF/BMP/TIFF photos to `apps/mobile/assets/image_test/`, stop and rebuild the app, then tap **DEV sample capture** on Camera. Select a photo to preview it, then press the normal shutter. Choose **Camera thật** in the same picker to return to native Camera. No filename list or code change is needed. HEIC/HEIF requires conversion; animated sources use their first frame. Cancel or an empty folder leaves the real camera available.
 
-~~~text
-apps/mobile/             Flutter app, tests and integration harnesses
-functions/               Callable logic and DEV scripts
-workers/media-gateway/   Authenticated media Worker
-firebase/                Firestore indexes
-firestore.rules          Client data-access boundaries
-design_ui_ux/            Supplied HTML/PNG references
-docs/portfolio/          Curated, source-labeled media/diagrams
-docs/evidence/           Dated verification
-~~~
+Optional `demo_metadata.json` in that folder maps image filenames to `title`, `locationLabel` and a local `HH:mm` time on the current day. Missing or invalid entries use the actual capture time and omit the optional labels. Photo discovery does not depend on this file.
 
-## Documentation
+The action requires debug mode and `APP_ENV=dev`; it is disabled in profile/release. **Asset files can still be bundled in release APKs**, so remove personal photos before public binary distribution. [Sample capture details](docs/DEV_SAMPLE_CAPTURE.md).
 
-[Portfolio Overview](docs/PORTFOLIO_OVERVIEW.md) · [Recruiter Demo](docs/RECRUITER_DEMO.md) · [CV Description](docs/CV_PROJECT_DESCRIPTION.md) · [Interview Notes](docs/INTERVIEW_NOTES.md) · [Media Index](docs/portfolio/MEDIA_INDEX.md)
+For UI-only exploration, run `flutter run --dart-define=APP_ENV=dev --dart-define=DEMO_MODE=true` from `apps/mobile`. This uses in-memory fixtures, not real sharing or backend E2E.
 
-Implementation history: [Interaction](docs/INTERACTION_PHASE.md), [Inbox/Calendar](docs/INBOX_CALENDAR_PHASE.md), [DEV Auth](docs/DEV_TEST_AUTH.md), [Backend DEV Unblock](docs/BACKEND_DEV_UNBLOCK.md), [Release Hardening](docs/RELEASE_HARDENING.md), [Testcase](testcase.md).
+## Project Status
 
-## Portfolio Notes
+The core Android DEV capture → processing → sharing → viewing flow is implemented and verified in the documented environment. README previews use real app screenshots. Google Sign-In E2E is deferred, and the production environment/release is **not ready**.
 
-Demonstrates mobile architecture/state management, reference-driven UI, camera lifecycle, image processing, auth/backend integration, security Rules, pagination, failure handling and E2E/release hardening.
+## Known Limitations
 
-Styling follows supplied HTML/PNG references; original visual-design authorship is not claimed. [CV wording](docs/CV_PROJECT_DESCRIPTION.md) is a contribution template—adapt it to work personally performed and explainable, not assumed solo authorship.
+- No completed real Google Sign-In E2E or production signing/configuration, App Links and release/R8 smoke verification.
+- Friends screens exist, but the current tab shell has no Friends launcher. After login, DEV navigation can use `adb -s emulator-5554 shell am start -a android.intent.action.VIEW -d inkstamp:///friends com.inkstamp.app`.
+- Revoke is backend/E2E-verified; Detail has no manual sender-revoke action. It denies new authorization and attempts media deletion, but cannot erase saved bytes/screenshots or immediately invalidate every previously issued URL/CDN cache.
+- Images are center-cropped to square before masking; no focal-point editor or automatic conversion of old memories.
+- PNG is larger than JPEG. Very noisy inputs may reduce RGB precision to fit the existing 5 MiB upload ceiling; alpha and dimensions are retained.
+- Physical-device, accessibility, process-death draft recovery and production/load-performance verification remain limited or unrun.
 
-## Security / License
-
-Never upload passwords, local Firebase/Cloudinary configuration, signing keys or generated APKs. See [Security](SECURITY.md). Verify third-party photo/design redistribution rights; golden renders do not prove asset licensing. Personal proprietary project: [License](LICENSE).
+See [release boundaries](docs/RELEASE_HARDENING.md), [architecture](docs/ARCHITECTURE.md), [Security](SECURITY.md) and [License](LICENSE).

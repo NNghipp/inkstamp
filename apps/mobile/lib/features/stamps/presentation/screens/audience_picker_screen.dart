@@ -84,7 +84,7 @@ class AudiencePickerScreen extends ConsumerWidget {
                           secondary: UserAvatar(name: friend.displayName),
                           title: Text(friend.displayName),
                           subtitle: Text('@${friend.username}'),
-                          activeColor: AppColors.ink,
+                          activeColor: Theme.of(context).colorScheme.primary,
                           contentPadding: EdgeInsets.zero,
                         );
                       },
@@ -128,8 +128,8 @@ class _AudienceOption extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: selected
-          ? AppColors.white
-          : AppColors.white.withValues(alpha: 0.6),
+          ? Theme.of(context).colorScheme.surfaceContainerHigh
+          : Theme.of(context).colorScheme.surfaceContainer,
       borderRadius: BorderRadius.circular(22),
       child: InkWell(
         onTap: onTap,
@@ -140,8 +140,13 @@ class _AudienceOption extends StatelessWidget {
             children: <Widget>[
               CircleAvatar(
                 radius: 25,
-                backgroundColor: color,
-                child: Icon(icon, color: AppColors.ink),
+                backgroundColor: Theme.of(
+                  context,
+                ).colorScheme.surfaceContainerHigh,
+                child: Icon(
+                  icon,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
@@ -157,7 +162,9 @@ class _AudienceOption extends StatelessWidget {
                     ),
                     Text(
                       subtitle,
-                      style: const TextStyle(color: AppColors.charcoal),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),
@@ -166,7 +173,9 @@ class _AudienceOption extends StatelessWidget {
                 selected
                     ? Icons.radio_button_checked_rounded
                     : Icons.radio_button_off_rounded,
-                color: selected ? AppColors.ink : AppColors.mist,
+                color: selected
+                    ? Theme.of(context).colorScheme.primary
+                    : Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ],
           ),

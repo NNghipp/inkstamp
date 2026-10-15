@@ -5,7 +5,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const adb = join(process.env.LOCALAPPDATA, 'Android/Sdk/platform-tools/adb.exe');
-const evidence = join(root, 'docs/evidence/2026-10-10/release-hardening');
+const evidence = join(root, 'docs/evidence/2026-10-15/dev-presentation');
 await mkdir(evidence, { recursive: true });
 const child = spawn('flutter.bat', ['test', '--no-uninstall',
   'integration_test/camera_lifecycle_stress_test.dart', '-d', 'emulator-5554',

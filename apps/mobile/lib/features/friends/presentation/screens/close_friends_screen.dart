@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:inkstamp/app/theme/app_colors.dart';
 import 'package:inkstamp/app/theme/app_spacing.dart';
 import 'package:inkstamp/core/widgets/inkstamp_scaffold.dart';
 import 'package:inkstamp/core/widgets/user_avatar.dart';
@@ -21,7 +20,7 @@ class CloseFriendsScreen extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.all(AppSpacing.md),
             decoration: BoxDecoration(
-              color: AppColors.butter.withValues(alpha: 0.45),
+              color: Theme.of(context).colorScheme.surfaceContainer,
               borderRadius: BorderRadius.circular(20),
             ),
             child: const Row(
@@ -58,7 +57,7 @@ class CloseFriendsScreen extends ConsumerWidget {
                   title: Text(friend.displayName),
                   subtitle: Text('@${friend.username}'),
                   contentPadding: EdgeInsets.zero,
-                  activeThumbColor: AppColors.ink,
+                  activeThumbColor: Theme.of(context).colorScheme.primary,
                 );
               },
             ),

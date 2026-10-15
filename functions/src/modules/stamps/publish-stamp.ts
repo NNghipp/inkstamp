@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { logger } from "firebase-functions";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { enforceAppCheck } from "../../config/callable-security.js";
@@ -49,6 +49,9 @@ export const publishStamp = onCall(
           frameStyle: input.frameStyle, paperTone: input.paperTone,
           replyToStampId: input.replyToStampId ?? null,
           createdAt: FieldValue.serverTimestamp(),
+          ...(input.capturedAt ? { capturedAt: Timestamp.fromDate(new Date(input.capturedAt)) } : {}),
+          ...(input.title ? { title: input.title } : {}),
+          ...(input.locationLabel ? { locationLabel: input.locationLabel } : {}),
         };
         transaction.create(stampReference, {
           ...media, audience: input.audience, recipientIds,

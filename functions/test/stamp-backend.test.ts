@@ -58,6 +58,19 @@ beforeEach(() => {
   state.notify.mockReset();
 });
 describe("atomic stamp publish and revoke (unit adapter)", () => {
+  it("copies optional capture metadata to stamp and delivery without replacing server time", async () => {
+    const capture = "2026-10-15T02:05:00.000Z";
+    const published = await publishStamp.run(request({ ...payload, capturedAt: capture, title: "Cổng đỏ Kyoto", locationLabel: "Kyoto" }));
+    const stamp = state.rows.get(`stamps/${published.stampId}`)!;
+    const delivery = state.rows.get(`users/b/deliveries/${published.stampId}`)!;
+    expect(stamp.title).toBe("Cổng đỏ Kyoto");
+    expect(stamp.locationLabel).toBe("Kyoto");
+    expect(delivery.capturedAt).toEqual(stamp.capturedAt);
+    expect(delivery.title).toBe(stamp.title);
+    expect(delivery.locationLabel).toBe(stamp.locationLabel);
+    expect(stamp.createdAt).not.toEqual(stamp.capturedAt);
+    expect(stamp.senderId).toBe("a");
+  });
   it("creates exactly one stamp, request and recipient delivery on repeated publish", async () => {
     const first = await publishStamp.run(request(payload));
     const second = await publishStamp.run(request(payload));

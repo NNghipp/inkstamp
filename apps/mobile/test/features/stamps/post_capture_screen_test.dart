@@ -83,7 +83,7 @@ void main() {
       UncontrolledProviderScope(
         container: scope,
         child: MaterialApp.router(
-          theme: AppTheme.light,
+          theme: AppTheme.dark,
           routerConfig: router,
           builder: (context, child) => MediaQuery(
             data: MediaQuery.of(

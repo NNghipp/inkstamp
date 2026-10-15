@@ -30,6 +30,7 @@ class StampArtwork extends ConsumerWidget {
     this.publicId,
     this.heroTag,
     this.showShadow = true,
+    this.capturedAt,
     super.key,
   });
 
@@ -41,6 +42,7 @@ class StampArtwork extends ConsumerWidget {
   final String? publicId;
   final Object? heroTag;
   final bool showShadow;
+  final DateTime? capturedAt;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -55,7 +57,7 @@ class StampArtwork extends ConsumerWidget {
                 errorBuilder: (_, _, _) =>
                     const Center(child: Text('Stamp không còn khả dụng.')),
               )
-            : MemoryPhoto(publicId: publicId),
+            : MemoryPhoto(publicId: publicId, capturedAt: capturedAt),
       );
       return heroTag == null ? photo : Hero(tag: heroTag!, child: photo);
     }

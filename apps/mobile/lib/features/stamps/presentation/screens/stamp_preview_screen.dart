@@ -5,9 +5,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:inkstamp/app/router/app_routes.dart';
 import 'package:inkstamp/app/theme/app_motion.dart';
+import 'package:inkstamp/app/theme/gallery_tokens.dart';
 import 'package:inkstamp/core/images/stamp_image_format.dart';
 import 'package:inkstamp/core/widgets/editorial_ui.dart';
 import 'package:inkstamp/core/widgets/motion_feedback.dart';
+import 'package:inkstamp/core/widgets/stamp_date_overlay.dart';
+import 'package:inkstamp/core/widgets/user_avatar.dart';
+import 'package:inkstamp/features/authentication/presentation/controllers/session_controller.dart';
 import 'package:inkstamp/features/friends/domain/entities/friend.dart';
 import 'package:inkstamp/features/friends/presentation/controllers/friends_controller.dart';
 import 'package:inkstamp/features/stamps/domain/entities/stamp.dart';
@@ -109,9 +113,9 @@ class _StampPreviewScreenState extends ConsumerState<StampPreviewScreen> {
                     ),
                     DecoratedBox(
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF0F0ED),
+                        color: GalleryTokens.glass,
                         borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: const Color(0xFFE0E0DB)),
+                        border: Border.all(color: GalleryTokens.line),
                       ),
                       child: const Padding(
                         padding: EdgeInsets.symmetric(
@@ -143,14 +147,24 @@ class _StampPreviewScreenState extends ConsumerState<StampPreviewScreen> {
                         ),
                       ),
                     ),
-                    const Align(
+                    Align(
                       alignment: Alignment.centerRight,
-                      child: EditorialAvatar(size: 29),
+                      child: widget.designPreview
+                          ? const EditorialAvatar(size: 29)
+                          : UserAvatar(
+                              name:
+                                  ref
+                                      .watch(sessionControllerProvider)
+                                      .user
+                                      ?.displayName ??
+                                  'InkStamp',
+                              size: 29,
+                            ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 73),
+              const SizedBox(height: 32),
               SettleIn(
                 child: AnimatedOpacity(
                   opacity: _leaving ? 0 : 1,
@@ -162,9 +176,7 @@ class _StampPreviewScreenState extends ConsumerState<StampPreviewScreen> {
                       localImagePath: widget.designPreview
                           ? null
                           : draft.localImagePath,
-                      capturedAt: DateTime.fromMillisecondsSinceEpoch(
-                        draft.seed,
-                      ),
+                      capturedAt: draft.captureTime,
                       designPreview: widget.designPreview,
                       phase: phase,
                       onReject: busy ? null : _discard,
@@ -174,10 +186,22 @@ class _StampPreviewScreenState extends ConsumerState<StampPreviewScreen> {
                 ),
               ),
               const SizedBox(height: 18),
-              _StampFacts(
-                stampShaped: isProcessedStampImage(draft.localImagePath),
-              ),
-              const SizedBox(height: 86),
+              if (draft.title != null)
+                Text(draft.title!, textAlign: TextAlign.center),
+              if (draft.locationLabel != null)
+                Text(
+                  draft.locationLabel!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: EditorialColors.muted,
+                    fontSize: 12,
+                  ),
+                ),
+              if (widget.designPreview)
+                _StampFacts(
+                  stampShaped: isProcessedStampImage(draft.localImagePath),
+                ),
+              const SizedBox(height: 32),
               Row(
                 children: <Widget>[
                   const TechnicalText(
@@ -319,7 +343,7 @@ class _StampPreviewScreenState extends ConsumerState<StampPreviewScreen> {
                   SizedBox(width: 6),
                   CircleAvatar(
                     radius: 6,
-                    backgroundColor: EditorialColors.ink,
+                    backgroundColor: GalleryTokens.surface,
                     child: Icon(Icons.check, color: Colors.white, size: 8),
                   ),
                   SizedBox(width: 6),
@@ -359,18 +383,7 @@ class _PreviewStamp extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 13),
       child: DecoratedBox(
-        decoration: isProcessedStampImage(localImagePath)
-            ? const BoxDecoration()
-            : const BoxDecoration(
-                color: Colors.white,
-                boxShadow: <BoxShadow>[
-                  BoxShadow(
-                    color: Color(0x15000000),
-                    blurRadius: 14,
-                    offset: Offset(0, 4),
-                  ),
-                ],
-              ),
+        decoration: const BoxDecoration(),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(8, 8, 8, 6),
           child: Column(
@@ -381,17 +394,21 @@ class _PreviewStamp extends StatelessWidget {
                   fit: StackFit.expand,
                   children: <Widget>[
                     if (localImagePath != null)
-                      Image.file(
-                        File(localImagePath!),
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) =>
-                            const Center(child: Text('Không thể đọc ảnh.')),
+                      StampDateOverlay(
+                        date: capturedAt ?? DateTime.now(),
+                        bottom: 48,
+                        child: Image.file(
+                          File(localImagePath!),
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) =>
+                              const Center(child: Text('Không thể đọc ảnh.')),
+                        ),
                       )
                     else if (designPreview)
                       Image.asset(EditorialAssets.preview, fit: BoxFit.cover)
                     else
                       const ColoredBox(
-                        color: Color(0xFFE7E7E2),
+                        color: GalleryTokens.surface,
                         child: Center(child: Text('Chụp ảnh để tạo tem.')),
                       ),
                     Positioned(
@@ -410,7 +427,7 @@ class _PreviewStamp extends StatelessWidget {
                             children: <Widget>[
                               const CircleAvatar(
                                 radius: 3,
-                                backgroundColor: Color(0xFFFFA800),
+                                backgroundColor: GalleryTokens.accent,
                               ),
                               const SizedBox(width: 6),
                               TechnicalText(
@@ -450,41 +467,43 @@ class _PreviewStamp extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 7),
-              Row(
-                children: <Widget>[
-                  const TechnicalText(
-                    'INKSTAMP · VIETNAM',
-                    color: EditorialColors.ink,
-                    fontSize: 7,
-                  ),
-                  const Spacer(),
-                  TechnicalText(
-                    designPreview
-                        ? 'TEM #142 · HN-026 · 26.09.2026'
-                        : DateFormat(
-                            'dd.MM.yyyy',
-                          ).format(capturedAt ?? DateTime.now()),
-                    color: EditorialColors.ink,
-                    fontSize: 7,
-                  ),
-                ],
-              ),
+              if (designPreview)
+                Row(
+                  children: <Widget>[
+                    const TechnicalText(
+                      'INKSTAMP · VIETNAM',
+                      color: EditorialColors.ink,
+                      fontSize: 7,
+                    ),
+                    const Spacer(),
+                    TechnicalText(
+                      designPreview
+                          ? 'TEM #142 · HN-026 · 26.09.2026'
+                          : DateFormat(
+                              'dd.MM.yyyy',
+                            ).format(capturedAt ?? DateTime.now()),
+                      color: EditorialColors.ink,
+                      fontSize: 7,
+                    ),
+                  ],
+                ),
               const SizedBox(height: 3),
-              Row(
-                children: <Widget>[
-                  const TechnicalText(
-                    'KHOẢNH KHẮC THẬT · KHÔNG QUA CHỈNH SỬA',
-                    fontSize: 6,
-                    letterSpacing: 0.45,
-                  ),
-                  const Spacer(),
-                  TechnicalText(
-                    designPreview ? '35MM · F/2.0 ·\n1/500S' : 'ẢNH ĐÃ XỬ LÝ',
-                    fontSize: 6,
-                    letterSpacing: 0.35,
-                  ),
-                ],
-              ),
+              if (designPreview)
+                Row(
+                  children: <Widget>[
+                    const TechnicalText(
+                      'KHOẢNH KHẮC THẬT · KHÔNG QUA CHỈNH SỬA',
+                      fontSize: 6,
+                      letterSpacing: 0.45,
+                    ),
+                    const Spacer(),
+                    TechnicalText(
+                      designPreview ? '35MM · F/2.0 ·\n1/500S' : 'ẢNH ĐÃ XỬ LÝ',
+                      fontSize: 6,
+                      letterSpacing: 0.35,
+                    ),
+                  ],
+                ),
             ],
           ),
         ),
@@ -523,8 +542,8 @@ class _DecisionButton extends StatelessWidget {
         child: GestureDetector(
           onTap: onTap,
           child: Container(
-            width: 45,
-            height: 45,
+            width: 48,
+            height: 48,
             decoration: BoxDecoration(
               color: const Color(0xCC262622),
               borderRadius: BorderRadius.circular(10),
@@ -632,7 +651,7 @@ class _Recipient extends StatelessWidget {
                         width: 48,
                         height: 48,
                         decoration: BoxDecoration(
-                          color: const Color(0xFFE7E7E2),
+                          color: GalleryTokens.surface,
                           borderRadius: BorderRadius.circular(10),
                           border: selected
                               ? Border.all(
@@ -669,7 +688,7 @@ class _Recipient extends StatelessWidget {
                           bottom: -4,
                           child: CircleAvatar(
                             radius: 8,
-                            backgroundColor: EditorialColors.ink,
+                            backgroundColor: GalleryTokens.surface,
                             child: Icon(
                               Icons.check,
                               size: 10,
