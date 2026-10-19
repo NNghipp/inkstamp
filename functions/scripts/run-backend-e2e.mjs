@@ -79,7 +79,7 @@ try {
   console.log(`BACKEND_E2E_EXIT=${status}`);
   process.exitCode = status ?? 1;
   if (status === 0 && readmePresentation) {
-    const destination = join(workspace, 'artifacts/readme-assets');
+    const destination = join(workspace, 'docs/readme-assets');
     await mkdir(destination, { recursive: true });
     for (const [source, target] of [
       ['camera-sample', 'camera-screen'], ['preview-stamp', 'preview-stamp'],
