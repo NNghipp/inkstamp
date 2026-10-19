@@ -24,16 +24,16 @@ function adbCall(args, input) {
 }
 let transferred = false;
 const evidence = join(workspace, readmePresentation
-  ? 'docs/evidence/2026-10-15/dev-presentation'
+  ? 'artifacts/evidence/2026-10-15/dev-presentation'
   : darkGallery
-  ? 'docs/evidence/2026-10-14/dark-gallery'
+  ? 'artifacts/evidence/2026-10-14/dark-gallery'
   : stampEdges
-  ? `docs/evidence/2026-10-11/stamp-edges${reusePhotos ? '/current' : ''}`
+  ? `artifacts/evidence/2026-10-11/stamp-edges${reusePhotos ? '/current' : ''}`
   : photoReview
-  ? `docs/evidence/2026-10-11/photo-presentation/${process.argv.includes('--before-photos') ? 'before-loaded' : reusePhotos ? 'after' : 'before'}`
+  ? `artifacts/evidence/2026-10-11/photo-presentation/${process.argv.includes('--before-photos') ? 'before-loaded' : reusePhotos ? 'after' : 'before'}`
   : process.argv.includes('--release-hardening')
-  ? 'docs/evidence/2026-10-10/release-hardening'
-  : 'docs/evidence/2026-10-07/backend-unblock');
+  ? 'artifacts/evidence/2026-10-10/release-hardening'
+  : 'artifacts/evidence/2026-10-07/backend-unblock');
 await mkdir(evidence, { recursive: true });
 const proxy = await startFaultProxy(faultControlSecret, async (name) => {
   const path = `/sdcard/inkstamp-backend-${name}.png`;
@@ -79,7 +79,7 @@ try {
   console.log(`BACKEND_E2E_EXIT=${status}`);
   process.exitCode = status ?? 1;
   if (status === 0 && readmePresentation) {
-    const destination = join(workspace, 'docs/readme-assets');
+    const destination = join(workspace, 'artifacts/readme-assets');
     await mkdir(destination, { recursive: true });
     for (const [source, target] of [
       ['camera-sample', 'camera-screen'], ['preview-stamp', 'preview-stamp'],

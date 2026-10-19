@@ -43,6 +43,7 @@ Thumbs.db
 .env.*
 !.env.example
 .tooling/
+artifacts/
 **/.kotlin/
 
 # Signing and release credentials

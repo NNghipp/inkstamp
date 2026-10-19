@@ -51,7 +51,7 @@ if (resetTestQuota) {
   const name = `${database}/documents/users/${a}/dailyQuotas/${day}_friendRequests`;
   const prior = (await db.get(name)).body;
   if (prior.fields?.action?.stringValue !== 'friendRequests') throw new Error('Wrong quota action');
-  const evidence = join(workspace, 'docs/evidence/2026-10-07/backend-unblock');
+  const evidence = join(workspace, 'artifacts/evidence/2026-10-07/backend-unblock');
   await mkdir(evidence, { recursive: true });
   const recordedAt = new Date().toISOString();
   await writeFile(join(evidence, `test-a-quota-before-${recordedAt.replace(/[:.]/g, '-')}.json`), JSON.stringify({ recordedAt, projectId: 'inkstamp-dev', prior }, null, 2), 'utf8');
